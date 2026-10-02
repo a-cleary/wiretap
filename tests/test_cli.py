@@ -1,0 +1,132 @@
+import json
+
+from wiretap.cli import main
+
+
+def test_cli_outputs_jsonl(test_pcap, monkeypatch, capsys):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "wiretap",
+            str(test_pcap),
+            "--jsonl",
+        ],
+    )
+
+    main()
+
+    output = capsys.readouterr().out
+    lines = output.strip().splitlines()
+
+    records = [
+        json.loads(line)
+        for line in lines
+    ]
+
+    record_types = [
+        record["type"]
+        for record in records
+    ]
+
+    assert record_types.count("flow") == 4
+    assert record_types.count("dns_query") == 1
+    assert record_types.count("dns_transaction") == 1
+    assert record_types.count("http_request") == 1
+    assert record_types.count("http_response") == 1
+    assert record_types.count("http_transaction") == 1
+
+    transactions = [
+        record
+        for record in records
+        if record["type"] == "http_transaction"
+    ]
+
+    assert len(transactions) == 1
+
+    transaction = transactions[0]
+
+    assert transaction["request"]["method"] == "GET"
+    assert transaction["request"]["host"] == "fileserver.corp.local"
+    assert transaction["request"]["path"] == "/admin/login"
+
+    assert transaction["response"]["status_code"] == 200
+    assert transaction["response"]["server"] == "nginx/1.24.0"
+
+    dns_transactions = [
+        record
+        for record in records
+        if record["type"] == "dns_transaction"
+    ]
+
+    assert len(dns_transactions) == 1
+
+    dns_transaction = dns_transactions[0]
+
+    assert dns_transaction["query"]["name"] == (
+        "fileserver.corp.local"
+    )
+
+    assert dns_transaction["query"]["type"] == "A"
+
+    assert dns_transaction["query"]["transaction_id"] == 1234
+
+    assert dns_transaction["response_code"] == 0
+
+    assert dns_transaction["answers"][0]["value"] == (
+        "10.10.10.20"
+    )
+
+    relationships = [
+        record
+        for record in records
+        if record["type"] == "relationship"
+    ]
+
+    assert len(relationships) == 5
+
+    assert {
+        (
+            relationship["source"],
+            relationship["relation"],
+            relationship["target"],
+        )
+        for relationship in relationships
+    } == {
+        (
+            "10.10.10.42",
+            "connects_to",
+            "10.10.10.20",
+        ),
+        (
+            "10.10.10.42",
+            "connects_to",
+            "10.10.10.30",
+        ),
+        (
+            "10.10.10.42",
+            "connects_to",
+            "10.10.10.10",
+        ),
+        (
+            "10.10.10.42",
+            "queried",
+            "fileserver.corp.local",
+        ),
+        (
+            "fileserver.corp.local",
+            "resolves_to",
+            "10.10.10.20",
+        ),
+    }
+
+    hostnames = [
+        record
+        for record in records
+        if record["type"] == "hostname"
+    ]
+
+    assert len(hostnames) == 1
+
+    assert hostnames[0]["name"] == (
+        "fileserver.corp.local"
+    )

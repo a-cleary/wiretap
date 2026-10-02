@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wiretap"
+version = "0.1.0"
+description = "Red-team network intelligence extraction from PCAP files"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "scapy>=2.6.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+wiretap = "wiretap.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
