@@ -19,6 +19,12 @@ from wiretap.output.jsonl import (
     serialize_relationship,
     serialize_service,
     service_to_dict,
+    serialize_tls_client_hello,
+    serialize_tls_server_hello,
+    serialize_tls_transaction,
+    tls_client_hello_to_dict,
+    tls_server_hello_to_dict,
+    tls_transaction_to_dict,
 )
 
 from wiretap.output.timeline import (
@@ -34,6 +40,9 @@ from wiretap.output.timeline import (
     relationship_to_timeline,
     service_to_timeline,
     sort_timeline,
+    tls_client_hello_to_timeline,
+    tls_server_hello_to_timeline,
+    tls_transaction_to_timeline,
 )
 
 __all__ = [
@@ -69,4 +78,13 @@ __all__ = [
     "observation_to_timeline",
     "relationship_to_timeline",
     "sort_timeline",
+    "serialize_tls_client_hello",
+    "serialize_tls_server_hello",
+    "serialize_tls_transaction",
+    "tls_client_hello_to_dict",
+    "tls_server_hello_to_dict",
+    "tls_transaction_to_dict",
+    "tls_client_hello_to_timeline",
+    "tls_server_hello_to_timeline",
+    "tls_transaction_to_timeline",
 ]

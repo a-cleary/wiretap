@@ -5,6 +5,10 @@ from wiretap.capture.http import (
     http_request_from_packet,
     http_response_from_packet,
 )
+from wiretap.capture.tls import (
+    tls_client_hello_from_packet,
+    tls_server_hello_from_packet,
+)
 
 
 Parser = Callable[[Any], Any | None]
@@ -14,6 +18,8 @@ PARSERS: list[Parser] = [
     dns_query_from_packet,
     http_request_from_packet,
     http_response_from_packet,
+    tls_client_hello_from_packet,
+    tls_server_hello_from_packet,
 ]
 
 

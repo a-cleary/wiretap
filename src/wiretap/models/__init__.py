@@ -14,6 +14,11 @@ from wiretap.models.http import (
 )
 from wiretap.models.relationship import Relationship
 from wiretap.models.service import Service
+from wiretap.models.tls import (
+    TLSClientHello,
+    TLSServerHello,
+    TLSTransaction,
+)
 
 __all__ = [
     "Connection",
@@ -29,4 +34,7 @@ __all__ = [
     "HTTPTransaction",
     "Relationship",
     "Service",
+    "TLSClientHello",
+    "TLSServerHello",
+    "TLSTransaction",
 ]

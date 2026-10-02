@@ -13,6 +13,9 @@ from wiretap.models import (
     HTTPTransaction,
     Relationship,
     Service,
+    TLSClientHello,
+    TLSServerHello,
+    TLSTransaction,
 )
 
 
@@ -357,6 +360,102 @@ def serialize_relationship(
 ) -> str:
     return json.dumps(
         relationship_to_dict(relationship),
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def tls_client_hello_to_dict(
+    hello: TLSClientHello,
+) -> dict[str, Any]:
+    return {
+        "type": "tls_client_hello",
+        "timestamp": _timestamp(
+            hello.timestamp
+        ),
+        "source_ip": hello.source_ip,
+        "source_port": hello.source_port,
+        "destination_ip": hello.destination_ip,
+        "destination_port": hello.destination_port,
+        "version": hello.version,
+        "server_name": hello.server_name,
+        "alpn_protocols": hello.alpn_protocols,
+        "cipher_suites": hello.cipher_suites,
+    }
+
+
+def serialize_tls_client_hello(
+    hello: TLSClientHello,
+) -> str:
+    return json.dumps(
+        tls_client_hello_to_dict(hello),
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def tls_server_hello_to_dict(
+    hello: TLSServerHello,
+) -> dict[str, Any]:
+    return {
+        "type": "tls_server_hello",
+        "timestamp": _timestamp(
+            hello.timestamp
+        ),
+        "source_ip": hello.source_ip,
+        "source_port": hello.source_port,
+        "destination_ip": hello.destination_ip,
+        "destination_port": hello.destination_port,
+        "version": hello.version,
+        "cipher_suite": hello.cipher_suite,
+        "alpn_protocol": hello.alpn_protocol,
+    }
+
+
+def serialize_tls_server_hello(
+    hello: TLSServerHello,
+) -> str:
+    return json.dumps(
+        tls_server_hello_to_dict(hello),
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def tls_transaction_to_dict(
+    transaction: TLSTransaction,
+) -> dict[str, Any]:
+    return {
+        "type": "tls_transaction",
+        "timestamp": _timestamp(
+            (
+                transaction.client_hello.timestamp
+                if transaction.client_hello is not None
+                else transaction.server_hello.timestamp
+            )
+        ),
+        "client_hello": (
+            tls_client_hello_to_dict(
+                transaction.client_hello
+            )
+            if transaction.client_hello is not None
+            else None
+        ),
+        "server_hello": (
+            tls_server_hello_to_dict(
+                transaction.server_hello
+            )
+            if transaction.server_hello is not None
+            else None
+        ),
+    }
+
+
+def serialize_tls_transaction(
+    transaction: TLSTransaction,
+) -> str:
+    return json.dumps(
+        tls_transaction_to_dict(transaction),
         separators=(",", ":"),
         sort_keys=True,
     )

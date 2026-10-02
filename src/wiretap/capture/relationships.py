@@ -3,6 +3,7 @@ from wiretap.models import (
     DNSTransaction,
     EntityRef,
     Relationship,
+    TLSTransaction,
 )
 
 
@@ -83,7 +84,10 @@ class RelationshipTracker:
             relation="runs",
             target=EntityRef(
                 type="service",
-                value=f"{flow.protocol}/{flow.responder.port}",
+                value=(
+                    f"{flow.protocol}/"
+                    f"{flow.responder.port}"
+                ),
             ),
             timestamp=flow.first_seen,
         )
@@ -108,7 +112,10 @@ class RelationshipTracker:
         )
 
         for answer in transaction.answers:
-            if answer.record_type not in {"A", "AAAA"}:
+            if answer.record_type not in {
+                "A",
+                "AAAA",
+            }:
                 continue
 
             self.add(
@@ -124,5 +131,32 @@ class RelationshipTracker:
                 timestamp=transaction.timestamp,
             )
 
+    def add_tls_transaction(
+        self,
+        transaction: TLSTransaction,
+    ) -> None:
+        hello = transaction.client_hello
+
+        if hello is None:
+            return
+
+        if hello.server_name is None:
+            return
+
+        self.add(
+            source=EntityRef(
+                type="host",
+                value=hello.source_ip,
+            ),
+            relation="accessed",
+            target=EntityRef(
+                type="hostname",
+                value=hello.server_name,
+            ),
+            timestamp=hello.timestamp,
+        )
+
     def relationships(self) -> list[Relationship]:
-        return list(self._relationships.values())
+        return list(
+            self._relationships.values()
+        )

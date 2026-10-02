@@ -12,8 +12,10 @@ from wiretap.models import (
     HTTPTransaction,
     Relationship,
     Service,
+    TLSClientHello,
+    TLSServerHello,
+    TLSTransaction,
 )
-
 from wiretap.output.jsonl import (
     connection_to_dict,
     dns_query_to_dict,
@@ -25,6 +27,9 @@ from wiretap.output.jsonl import (
     http_transaction_to_dict,
     relationship_to_dict,
     service_to_dict,
+    tls_client_hello_to_dict,
+    tls_server_hello_to_dict,
+    tls_transaction_to_dict,
 )
 
 
@@ -156,6 +161,16 @@ def observation_to_timeline(
     if isinstance(observation, HTTPResponse):
         return http_response_to_timeline(observation)
 
+    if isinstance(observation, TLSClientHello):
+        return tls_client_hello_to_timeline(
+            observation
+        )
+
+    if isinstance(observation, TLSServerHello):
+        return tls_server_hello_to_timeline(
+            observation
+        )
+
     raise TypeError(
         f"Unsupported observation type: "
         f"{type(observation).__name__}"
@@ -168,4 +183,43 @@ def sort_timeline(
     return sorted(
         records,
         key=lambda record: record.timestamp,
+    )
+
+
+def tls_client_hello_to_timeline(
+    hello: TLSClientHello,
+) -> TimelineRecord:
+    return TimelineRecord(
+        timestamp=hello.timestamp,
+        record_type="tls_client_hello",
+        data=tls_client_hello_to_dict(hello),
+    )
+
+
+def tls_server_hello_to_timeline(
+    hello: TLSServerHello,
+) -> TimelineRecord:
+    return TimelineRecord(
+        timestamp=hello.timestamp,
+        record_type="tls_server_hello",
+        data=tls_server_hello_to_dict(hello),
+    )
+
+
+def tls_transaction_to_timeline(
+    transaction: TLSTransaction,
+) -> TimelineRecord:
+    if transaction.client_hello is not None:
+        timestamp = transaction.client_hello.timestamp
+    elif transaction.server_hello is not None:
+        timestamp = transaction.server_hello.timestamp
+    else:
+        raise ValueError(
+            "TLS transaction contains no hello"
+        )
+
+    return TimelineRecord(
+        timestamp=timestamp,
+        record_type="tls_transaction",
+        data=tls_transaction_to_dict(transaction),
     )

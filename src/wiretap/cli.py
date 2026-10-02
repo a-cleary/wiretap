@@ -12,6 +12,7 @@ from wiretap.output.timeline import (
     relationship_to_timeline,
     service_to_timeline,
     sort_timeline,
+    tls_transaction_to_timeline,
 )
 
 
@@ -70,6 +71,15 @@ def main() -> None:
         ):
             timeline.append(
                 http_transaction_to_timeline(
+                    transaction
+                )
+            )
+
+        for transaction in (
+            processor.tls_tracker.transactions()
+        ):
+            timeline.append(
+                tls_transaction_to_timeline(
                     transaction
                 )
             )

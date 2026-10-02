@@ -22,6 +22,14 @@ from wiretap.capture.reader import (
     PcapReader,
 )
 from wiretap.capture.relationships import RelationshipTracker
+from wiretap.capture.tls import (
+    tls_client_hello_from_packet,
+    tls_server_hello_from_packet,
+)
+from wiretap.capture.tls_transactions import (
+    TLSFlowKey,
+    TLSTransactionTracker,
+)
 
 __all__ = [
     "connection_from_packet",
@@ -38,4 +46,8 @@ __all__ = [
     "PacketReader",
     "PcapReader",
     "RelationshipTracker",
+    "tls_client_hello_from_packet",
+    "tls_server_hello_from_packet",
+    "TLSFlowKey",
+    "TLSTransactionTracker",
 ]

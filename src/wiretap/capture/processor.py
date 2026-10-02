@@ -5,23 +5,33 @@ from wiretap.capture.dns import (
 from wiretap.capture.dns_transactions import (
     DNSTransactionTracker,
 )
+from wiretap.capture.entities import EntityTracker
 from wiretap.capture.flow import FlowTracker
 from wiretap.capture.http_transactions import (
     HTTPTransactionTracker,
 )
 from wiretap.capture.parsers import parse_packet
-from wiretap.models import DNSQuery, HTTPRequest, HTTPResponse
-from wiretap.capture.entities import EntityTracker
 from wiretap.capture.relationships import RelationshipTracker
+from wiretap.capture.tls_transactions import (
+    TLSTransactionTracker,
+)
+from wiretap.models import (
+    DNSQuery,
+    HTTPRequest,
+    HTTPResponse,
+    TLSClientHello,
+    TLSServerHello,
+)
 
 
 class CaptureProcessor:
     def __init__(self) -> None:
         self.flow_tracker = FlowTracker()
         self.entity_tracker = EntityTracker()
+        self.relationship_tracker = RelationshipTracker()
         self.http_tracker = HTTPTransactionTracker()
         self.dns_tracker = DNSTransactionTracker()
-        self.relationship_tracker = RelationshipTracker()
+        self.tls_tracker = TLSTransactionTracker()
 
         self.observations = []
 
@@ -41,18 +51,46 @@ class CaptureProcessor:
             self.observations.append(observation)
 
             if isinstance(observation, DNSQuery):
-                self.dns_tracker.add_query(observation)
+                self.dns_tracker.add_query(
+                    observation
+                )
 
             elif isinstance(observation, HTTPRequest):
-                self.http_tracker.add_request(observation)
+                self.http_tracker.add_request(
+                    observation
+                )
 
             elif isinstance(observation, HTTPResponse):
-                self.http_tracker.add_response(observation)
+                self.http_tracker.add_response(
+                    observation
+                )
 
-        response = dns_response_metadata_from_packet(packet)
+            elif isinstance(
+                observation,
+                TLSClientHello,
+            ):
+                self.tls_tracker.add_client_hello(
+                    observation
+                )
+
+            elif isinstance(
+                observation,
+                TLSServerHello,
+            ):
+                self.tls_tracker.add_server_hello(
+                    observation
+                )
+
+        response = dns_response_metadata_from_packet(
+            packet
+        )
 
         if response is not None:
-            transaction_id, response_code, timestamp = response
+            (
+                transaction_id,
+                response_code,
+                timestamp,
+            ) = response
 
             ip = packet["IP"]
 
@@ -68,13 +106,28 @@ class CaptureProcessor:
     def finalize(self) -> None:
         for flow in self.flow_tracker.flows():
             self.entity_tracker.add_flow(flow)
-            self.relationship_tracker.add_flow(flow)
+            self.relationship_tracker.add_flow(
+                flow
+            )
 
-        for transaction in self.dns_tracker.transactions():
+        for transaction in (
+            self.dns_tracker.transactions()
+        ):
             self.entity_tracker.add_dns_transaction(
                 transaction
             )
 
             self.relationship_tracker.add_dns_transaction(
+                transaction
+            )
+
+        for transaction in (
+            self.tls_tracker.transactions()
+        ):
+            self.entity_tracker.add_tls_transaction(
+                transaction
+            )
+
+            self.relationship_tracker.add_tls_transaction(
                 transaction
             )

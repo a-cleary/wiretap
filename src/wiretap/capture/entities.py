@@ -1,5 +1,12 @@
 from wiretap.capture.flow import Flow
-from wiretap.models import EntityRef, Host, Hostname, Service
+from wiretap.models import (
+    EntityRef,
+    Host,
+    Hostname,
+    Service,
+    TLSClientHello,
+    TLSTransaction,
+)
 
 
 class EntityTracker:
@@ -59,7 +66,10 @@ class EntityTracker:
                 transaction.timestamp,
             )
 
-            if answer.record_type not in {"A", "AAAA"}:
+            if answer.record_type not in {
+                "A",
+                "AAAA",
+            }:
                 continue
 
             self._add_host(
@@ -67,6 +77,54 @@ class EntityTracker:
                 query.timestamp,
                 transaction.timestamp,
             )
+
+    def add_tls_transaction(
+        self,
+        transaction: TLSTransaction,
+    ) -> None:
+        hello = transaction.client_hello
+
+        if hello is None:
+            return
+
+        if hello.server_name is None:
+            return
+
+        self._add_hostname(
+            hello.server_name,
+            hello.timestamp,
+            hello.timestamp,
+        )
+
+    def service_ref(
+        self,
+        service: Service,
+    ) -> EntityRef:
+        return EntityRef(
+            type="service",
+            value=(
+                f"{service.protocol}/"
+                f"{service.port}"
+            ),
+        )
+
+    def host_ref(
+        self,
+        host: Host,
+    ) -> EntityRef:
+        return EntityRef(
+            type="host",
+            value=host.ip,
+        )
+
+    def hostname_ref(
+        self,
+        hostname: Hostname,
+    ) -> EntityRef:
+        return EntityRef(
+            type="hostname",
+            value=hostname.name,
+        )
 
     def _add_host(
         self,
@@ -164,12 +222,3 @@ class EntityTracker:
 
     def services(self) -> list[Service]:
         return list(self._services.values())
-
-    def service_ref(
-        self,
-        service: Service,
-    ) -> EntityRef:
-        return EntityRef(
-            type="service",
-            value=f"{service.protocol}/{service.port}",
-        )
