@@ -155,20 +155,100 @@ def test_relationship_tracker_adds_flow_relationship():
 
     relationships = tracker.relationships()
 
-    assert len(relationships) == 1
+    assert len(relationships) == 2
 
-    relationship = relationships[0]
+    connects_to = next(
+        relationship
+        for relationship in relationships
+        if relationship.relation == "connects_to"
+    )
 
-    assert relationship.source == EntityRef(
+    assert connects_to.source == EntityRef(
         type="host",
         value="10.10.10.42",
     )
 
-    assert relationship.relation == "connects_to"
+    assert connects_to.relation == "connects_to"
 
-    assert relationship.target == EntityRef(
+    assert connects_to.target == EntityRef(
         type="host",
         value="10.10.10.20",
+    )
+
+    runs = next(
+        relationship
+        for relationship in relationships
+        if relationship.relation == "runs"
+    )
+
+    assert runs.source == EntityRef(
+        type="host",
+        value="10.10.10.20",
+    )
+
+    assert runs.relation == "runs"
+
+    assert runs.target == EntityRef(
+        type="service",
+        value="tcp/80",
+    )
+
+
+def test_relationship_tracker_adds_service_relationship():
+    timestamp = datetime(
+        2026,
+        1,
+        1,
+        0,
+        0,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    flow = Flow(
+        endpoint_a=Endpoint(
+            ip="10.10.10.20",
+            port=80,
+        ),
+        endpoint_b=Endpoint(
+            ip="10.10.10.42",
+            port=49152,
+        ),
+        protocol="tcp",
+        first_seen=timestamp,
+        last_seen=timestamp,
+        initiator=Endpoint(
+            ip="10.10.10.42",
+            port=49152,
+        ),
+        responder=Endpoint(
+            ip="10.10.10.20",
+            port=80,
+        ),
+    )
+
+    tracker = RelationshipTracker()
+
+    tracker.add_flow(flow)
+
+    relationships = tracker.relationships()
+
+    service_relationship = next(
+        relationship
+        for relationship in relationships
+        if relationship.relation == "runs"
+    )
+
+    assert service_relationship.source == EntityRef(
+        type="host",
+        value="10.10.10.20",
+    )
+
+    assert service_relationship.relation == "runs"
+
+    assert service_relationship.target == EntityRef(
+        type="service",
+        value="tcp/80",
     )
 
 

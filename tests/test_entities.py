@@ -2,8 +2,10 @@ from datetime import datetime, timedelta, timezone
 
 from wiretap.capture.entities import EntityTracker
 from wiretap.capture.flow import Flow
-from wiretap.models import Endpoint
-
+from wiretap.models import (
+    Endpoint,
+    EntityRef,
+)
 
 def make_flow(
     source_ip: str,
@@ -325,3 +327,56 @@ def test_dns_transaction_discovers_resolved_host():
     } == {
         "10.10.10.20",
     }
+
+
+def test_entity_tracker_creates_service_entity_ref():
+    timestamp = datetime(
+        2026,
+        1,
+        1,
+        0,
+        0,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    tracker = EntityTracker()
+
+    flow = Flow(
+        endpoint_a=Endpoint(
+            ip="10.10.10.42",
+            port=49152,
+        ),
+        endpoint_b=Endpoint(
+            ip="10.10.10.20",
+            port=80,
+        ),
+        protocol="tcp",
+        first_seen=timestamp,
+        last_seen=timestamp,
+        initiator=Endpoint(
+            ip="10.10.10.42",
+            port=49152,
+        ),
+        responder=Endpoint(
+            ip="10.10.10.20",
+            port=80,
+        ),
+    )
+
+    tracker.add_flow(flow)
+
+    services = tracker.services()
+
+    assert len(services) == 1
+
+    service_ref = tracker.service_ref(
+        services[0]
+    )
+
+    assert service_ref == EntityRef(
+        type="service",
+        value="tcp/80",
+    )
+
+    assert service_ref.id == "service:tcp/80"

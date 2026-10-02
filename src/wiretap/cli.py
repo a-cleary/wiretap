@@ -1,38 +1,38 @@
 import argparse
 import json
-from pathlib import Path
 
-from wiretap.capture import (
-    CaptureProcessor,
-    PcapReader,
-)
+from wiretap.capture.processor import CaptureProcessor
+from wiretap.capture.reader import PcapReader
 from wiretap.output.timeline import (
     dns_transaction_to_timeline,
     flow_to_timeline,
+    hostname_to_timeline,
     http_transaction_to_timeline,
     observation_to_timeline,
     relationship_to_timeline,
+    service_to_timeline,
     sort_timeline,
-    hostname_to_timeline,
 )
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="wiretap",
-        description="Network intelligence extraction from PCAP files",
+        description=(
+            "Red-team network intelligence "
+            "extraction from PCAP files"
+        ),
     )
 
     parser.add_argument(
         "capture",
-        type=Path,
-        help="PCAP/PCAPNG file",
+        help="Path to a PCAP or PCAPNG file",
     )
 
     parser.add_argument(
         "--jsonl",
         action="store_true",
-        help="Output JSON Lines",
+        help="Output JSONL records",
     )
 
     return parser
@@ -47,7 +47,7 @@ def main() -> None:
 
     for packet in reader.read():
         processor.process_packet(packet)
-        
+
     processor.finalize()
 
     if args.jsonl:
@@ -60,33 +60,50 @@ def main() -> None:
 
         for observation in processor.observations:
             timeline.append(
-                observation_to_timeline(observation)
+                observation_to_timeline(
+                    observation
+                )
             )
 
         for transaction in (
             processor.http_tracker.transactions()
         ):
             timeline.append(
-                http_transaction_to_timeline(transaction)
+                http_transaction_to_timeline(
+                    transaction
+                )
             )
 
         for transaction in (
             processor.dns_tracker.transactions()
         ):
             timeline.append(
-                dns_transaction_to_timeline(transaction)
+                dns_transaction_to_timeline(
+                    transaction
+                )
+            )
+
+        for hostname in (
+            processor.entity_tracker.hostnames()
+        ):
+            timeline.append(
+                hostname_to_timeline(hostname)
+            )
+
+        for service in (
+            processor.entity_tracker.services()
+        ):
+            timeline.append(
+                service_to_timeline(service)
             )
 
         for relationship in (
             processor.relationship_tracker.relationships()
         ):
             timeline.append(
-                relationship_to_timeline(relationship)
-            )
-
-        for hostname in processor.entity_tracker.hostnames():
-            timeline.append(
-                hostname_to_timeline(hostname)
+                relationship_to_timeline(
+                    relationship
+                )
             )
 
         for record in sort_timeline(timeline):
@@ -97,7 +114,3 @@ def main() -> None:
                     sort_keys=True,
                 )
             )
-
-
-if __name__ == "__main__":
-    main()

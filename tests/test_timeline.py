@@ -2,23 +2,33 @@ from datetime import datetime, timedelta, timezone
 
 from wiretap.capture.flow import Flow
 from wiretap.models import (
+    DNSAnswer,
     DNSQuery,
+    DNSTransaction,
     Endpoint,
+    EntityRef,
+    Hostname,
     HTTPRequest,
     HTTPResponse,
     HTTPTransaction,
     Relationship,
-    EntityRef,
+    Service,
 )
 from wiretap.output.timeline import (
+    TimelineRecord,
     dns_to_timeline,
+    dns_transaction_to_timeline,
     flow_to_timeline,
-    http_to_timeline,
+    hostname_to_timeline,
     http_response_to_timeline,
+    http_to_timeline,
     http_transaction_to_timeline,
     observation_to_timeline,
+    relationship_to_timeline,
+    service_to_timeline,
     sort_timeline,
 )
+
 
 def test_flow_to_timeline():
     timestamp = datetime(
@@ -61,8 +71,21 @@ def test_flow_to_timeline():
     assert record.timestamp == timestamp
     assert record.record_type == "flow"
     assert record.data["type"] == "flow"
-    assert record.data["initiator"]["ip"] == "10.10.10.42"
-    assert record.data["responder"]["ip"] == "10.10.10.20"
+
+    assert record.data["initiator_ip"] == (
+        "10.10.10.42"
+    )
+
+    assert record.data["initiator_port"] == 49152
+
+    assert record.data["responder_ip"] == (
+        "10.10.10.20"
+    )
+
+    assert record.data["responder_port"] == 80
+
+    assert record.data["packets"] == 3
+    assert record.data["bytes"] == 174
 
 
 def test_observation_to_timeline_dns():
@@ -88,7 +111,18 @@ def test_observation_to_timeline_dns():
     assert record.timestamp == timestamp
     assert record.record_type == "dns_query"
     assert record.data["type"] == "dns_query"
-    assert record.data["query"] == "fileserver.corp.local"
+
+    assert record.data["name"] == (
+        "fileserver.corp.local"
+    )
+
+    assert record.data["source_ip"] == (
+        "10.10.10.42"
+    )
+
+    assert record.data["destination_ip"] == (
+        "10.10.10.10"
+    )
 
 
 def test_observation_to_timeline_http():
@@ -120,14 +154,22 @@ def test_observation_to_timeline_http():
     assert record.record_type == "http_request"
     assert record.data["type"] == "http_request"
 
-    assert record.data["source"]["ip"] == "10.10.10.42"
-    assert record.data["source"]["port"] == 49152
+    assert record.data["source_ip"] == (
+        "10.10.10.42"
+    )
 
-    assert record.data["destination"]["ip"] == "10.10.10.20"
-    assert record.data["destination"]["port"] == 80
+    assert record.data["source_port"] == 49152
+
+    assert record.data["destination_ip"] == (
+        "10.10.10.20"
+    )
+
+    assert record.data["destination_port"] == 80
 
     assert record.data["method"] == "GET"
-    assert record.data["host"] == "fileserver.corp.local"
+    assert record.data["host"] == (
+        "fileserver.corp.local"
+    )
     assert record.data["path"] == "/admin/login"
 
 
@@ -162,69 +204,20 @@ def test_observation_to_timeline_http_response():
     assert record.record_type == "http_response"
     assert record.data["type"] == "http_response"
 
-    assert record.data["source"]["ip"] == "10.10.10.20"
-    assert record.data["source"]["port"] == 80
+    assert record.data["source_ip"] == (
+        "10.10.10.20"
+    )
 
-    assert record.data["destination"]["ip"] == "10.10.10.42"
-    assert record.data["destination"]["port"] == 49152
+    assert record.data["source_port"] == 80
+
+    assert record.data["destination_ip"] == (
+        "10.10.10.42"
+    )
+
+    assert record.data["destination_port"] == 49152
 
     assert record.data["status_code"] == 200
-    assert record.data["reason"] == "OK"
     assert record.data["server"] == "nginx/1.24.0"
-
-
-def test_sort_timeline():
-    start = datetime(
-        2026,
-        9,
-        30,
-        12,
-        0,
-        tzinfo=timezone.utc,
-    )
-
-    records = [
-        (
-            start + timedelta(seconds=30),
-            "http_request",
-        ),
-        (
-            start,
-            "dns_query",
-        ),
-        (
-            start + timedelta(seconds=10),
-            "flow",
-        ),
-    ]
-
-    timeline_records = []
-
-    for timestamp, record_type in records:
-        timeline_records.append(
-            type(
-                "TimelineRecord",
-                (),
-                {
-                    "timestamp": timestamp,
-                    "record_type": record_type,
-                    "data": {},
-                },
-            )()
-        )
-
-    sorted_records = sort_timeline(
-        timeline_records
-    )
-
-    assert [
-        record.record_type
-        for record in sorted_records
-    ] == [
-        "dns_query",
-        "flow",
-        "http_request",
-    ]
 
 
 def test_http_transaction_to_timeline():
@@ -270,22 +263,142 @@ def test_http_transaction_to_timeline():
         response=response,
     )
 
-    record = http_transaction_to_timeline(transaction)
+    record = http_transaction_to_timeline(
+        transaction
+    )
 
-    assert record.record_type == "http_transaction"
     assert record.timestamp == timestamp
-    assert record.data["request"]["path"] == "/admin/login"
+    assert record.record_type == "http_transaction"
+    assert record.data["type"] == "http_transaction"
+
+    assert record.data["request"]["method"] == "GET"
+    assert record.data["request"]["host"] == (
+        "fileserver.corp.local"
+    )
+
     assert record.data["response"]["status_code"] == 200
+    assert record.data["response"]["server"] == (
+        "nginx/1.24.0"
+    )
+
+
+def test_dns_transaction_to_timeline():
+    timestamp = datetime(
+        2026,
+        9,
+        30,
+        12,
+        0,
+        tzinfo=timezone.utc,
+    )
+
+    query = DNSQuery(
+        timestamp=timestamp,
+        source_ip="10.10.10.42",
+        destination_ip="10.10.10.10",
+        query="fileserver.corp.local",
+        query_type="A",
+        transaction_id=1234,
+    )
+
+    transaction = DNSTransaction(
+        timestamp=timestamp,
+        source_ip="10.10.10.42",
+        destination_ip="10.10.10.10",
+        query=query,
+        answers=[
+            DNSAnswer(
+                name="fileserver.corp.local",
+                record_type="A",
+                value="10.10.10.20",
+                ttl=300,
+            )
+        ],
+        response_code=0,
+    )
+
+    record = dns_transaction_to_timeline(
+        transaction
+    )
+
+    assert record.timestamp == timestamp
+    assert record.record_type == "dns_transaction"
+    assert record.data["type"] == "dns_transaction"
+
+    assert record.data["query"]["name"] == (
+        "fileserver.corp.local"
+    )
+
+    assert record.data["query"]["type"] == "A"
+
+    assert record.data["query"]["transaction_id"] == 1234
+
+    assert record.data["answers"][0]["value"] == (
+        "10.10.10.20"
+    )
+
+
+def test_hostname_to_timeline():
+    timestamp = datetime(
+        2026,
+        9,
+        30,
+        12,
+        0,
+        tzinfo=timezone.utc,
+    )
+
+    hostname = Hostname(
+        name="fileserver.corp.local",
+        first_seen=timestamp,
+        last_seen=timestamp,
+    )
+
+    record = hostname_to_timeline(hostname)
+
+    assert record.timestamp == timestamp
+    assert record.record_type == "hostname"
+    assert record.data["type"] == "hostname"
+
+    assert record.data["name"] == (
+        "fileserver.corp.local"
+    )
+
+
+def test_service_to_timeline():
+    timestamp = datetime(
+        2026,
+        9,
+        30,
+        12,
+        0,
+        tzinfo=timezone.utc,
+    )
+
+    service = Service(
+        host_ip="10.10.10.20",
+        port=80,
+        protocol="tcp",
+        first_seen=timestamp,
+        last_seen=timestamp,
+    )
+
+    record = service_to_timeline(service)
+
+    assert record.timestamp == timestamp
+    assert record.record_type == "service"
+    assert record.data["type"] == "service"
+
+    assert record.data["host_ip"] == (
+        "10.10.10.20"
+    )
+
+    assert record.data["port"] == 80
+    assert record.data["protocol"] == "tcp"
+    assert record.data["id"] == "service:tcp/80"
 
 
 def test_relationship_to_timeline():
-    from datetime import datetime, timezone
-
-    from wiretap.models import Relationship
-    from wiretap.output.timeline import (
-        relationship_to_timeline,
-    )
-
     timestamp = datetime(
         2026,
         1,
@@ -316,4 +429,79 @@ def test_relationship_to_timeline():
 
     assert record.timestamp == timestamp
     assert record.record_type == "relationship"
+    assert record.data["type"] == "relationship"
+
+    assert record.data["source"] == (
+        "host:10.10.10.42"
+    )
+
+    assert record.data["source_type"] == "host"
+
+    assert record.data["target"] == (
+        "hostname:fileserver.corp.local"
+    )
+
+    assert record.data["target_type"] == "hostname"
+
     assert record.data["relation"] == "queried"
+
+
+def test_sort_timeline():
+    first_timestamp = datetime(
+        2026,
+        9,
+        30,
+        12,
+        0,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    second_timestamp = datetime(
+        2026,
+        9,
+        30,
+        12,
+        0,
+        2,
+        tzinfo=timezone.utc,
+    )
+
+    third_timestamp = datetime(
+        2026,
+        9,
+        30,
+        12,
+        0,
+        3,
+        tzinfo=timezone.utc,
+    )
+
+    records = [
+        TimelineRecord(
+            timestamp=third_timestamp,
+            record_type="third",
+            data={},
+        ),
+        TimelineRecord(
+            timestamp=first_timestamp,
+            record_type="first",
+            data={},
+        ),
+        TimelineRecord(
+            timestamp=second_timestamp,
+            record_type="second",
+            data={},
+        ),
+    ]
+
+    sorted_records = sort_timeline(records)
+
+    assert [
+        record.record_type
+        for record in sorted_records
+    ] == [
+        "first",
+        "second",
+        "third",
+    ]

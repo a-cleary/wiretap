@@ -1,5 +1,5 @@
 from wiretap.capture.flow import Flow
-from wiretap.models import Host, Hostname, Service
+from wiretap.models import EntityRef, Host, Hostname, Service
 
 
 class EntityTracker:
@@ -164,3 +164,12 @@ class EntityTracker:
 
     def services(self) -> list[Service]:
         return list(self._services.values())
+
+    def service_ref(
+        self,
+        service: Service,
+    ) -> EntityRef:
+        return EntityRef(
+            type="service",
+            value=f"{service.protocol}/{service.port}",
+        )

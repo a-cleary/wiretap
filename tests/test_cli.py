@@ -35,7 +35,43 @@ def test_cli_outputs_jsonl(test_pcap, monkeypatch, capsys):
     assert record_types.count("http_response") == 1
     assert record_types.count("http_transaction") == 1
     assert record_types.count("hostname") == 1
-    assert record_types.count("relationship") == 5
+    assert record_types.count("service") == 4
+    assert record_types.count("relationship") == 9
+
+    services = [
+        record
+        for record in records
+        if record["type"] == "service"
+    ]
+
+    assert len(services) == 4
+
+    assert {
+        service["id"]
+        for service in services
+    } == {
+        "service:tcp/80",
+        "service:tcp/445",
+        "service:tcp/88",
+        "service:udp/53",
+    }
+
+    service_by_id = {
+        service["id"]: service
+        for service in services
+    }
+
+    assert service_by_id["service:tcp/80"][
+        "host_ip"
+    ] == "10.10.10.20"
+
+    assert service_by_id["service:tcp/80"][
+        "port"
+    ] == 80
+
+    assert service_by_id["service:tcp/80"][
+        "protocol"
+    ] == "tcp"
 
     transactions = [
         record
@@ -100,7 +136,7 @@ def test_cli_outputs_jsonl(test_pcap, monkeypatch, capsys):
         if record["type"] == "relationship"
     ]
 
-    assert len(relationships) == 5
+    assert len(relationships) == 9
 
     assert {
         (
@@ -124,6 +160,26 @@ def test_cli_outputs_jsonl(test_pcap, monkeypatch, capsys):
             "host:10.10.10.42",
             "connects_to",
             "host:10.10.10.10",
+        ),
+        (
+            "host:10.10.10.20",
+            "runs",
+            "service:tcp/80",
+        ),
+        (
+            "host:10.10.10.30",
+            "runs",
+            "service:tcp/445",
+        ),
+        (
+            "host:10.10.10.10",
+            "runs",
+            "service:tcp/88",
+        ),
+        (
+            "host:10.10.10.10",
+            "runs",
+            "service:udp/53",
         ),
         (
             "host:10.10.10.42",

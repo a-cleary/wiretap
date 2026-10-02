@@ -72,6 +72,22 @@ class RelationshipTracker:
             timestamp=flow.first_seen,
         )
 
+        if flow.responder.port is None:
+            return
+
+        self.add(
+            source=EntityRef(
+                type="host",
+                value=flow.responder.ip,
+            ),
+            relation="runs",
+            target=EntityRef(
+                type="service",
+                value=f"{flow.protocol}/{flow.responder.port}",
+            ),
+            timestamp=flow.first_seen,
+        )
+
     def add_dns_transaction(
         self,
         transaction: DNSTransaction,
