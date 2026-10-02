@@ -4,6 +4,7 @@ from wiretap.models.dns import (
     DNSQuery,
     DNSTransaction,
 )
+from wiretap.models.entity import EntityRef
 from wiretap.models.host import Host
 from wiretap.models.hostname import Hostname
 from wiretap.models.http import (
@@ -20,6 +21,7 @@ __all__ = [
     "DNSAnswer",
     "DNSQuery",
     "DNSTransaction",
+    "EntityRef",
     "Host",
     "Hostname",
     "HTTPRequest",
