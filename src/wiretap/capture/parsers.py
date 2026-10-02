@@ -12,6 +12,9 @@ from wiretap.capture.tls import (
 from wiretap.capture.tls_certificates import (
     tls_certificates_from_packet,
 )
+from wiretap.capture.smb import (
+    smb_observations_from_packet,
+)
 
 
 Parser = Callable[[Any], Any]
@@ -24,6 +27,7 @@ PARSERS: list[Parser] = [
     tls_client_hello_from_packet,
     tls_server_hello_from_packet,
     tls_certificates_from_packet,
+    smb_observations_from_packet,
 ]
 
 

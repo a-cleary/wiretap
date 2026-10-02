@@ -5,6 +5,9 @@ from wiretap.models import (
     Relationship,
     TLSCertificate,
     TLSTransaction,
+    SMBFileOperation,
+    SMBSessionSetup,
+    SMBTreeConnect,
 )
 
 
@@ -174,6 +177,74 @@ class RelationshipTracker:
             relation="presented_certificate",
             target=certificate_ref,
             timestamp=certificate.timestamp,
+        )
+
+    def add_smb_session_setup(
+        self,
+        observation: SMBSessionSetup,
+    ) -> None:
+        if not observation.username:
+            return
+
+        identity = observation.username
+
+        if observation.domain:
+            identity = (
+                f"{observation.domain}\\"
+                f"{identity}"
+            )
+
+        self.add(
+            source=EntityRef(
+                type="host",
+                value=observation.source_ip,
+            ),
+            relation="authenticated_as",
+            target=EntityRef(
+                type="identity",
+                value=identity,
+            ),
+            timestamp=observation.timestamp,
+        )
+
+    def add_smb_tree_connect(
+        self,
+        observation: SMBTreeConnect,
+    ) -> None:
+        if not observation.share:
+            return
+
+        self.add(
+            source=EntityRef(
+                type="host",
+                value=observation.source_ip,
+            ),
+            relation="accessed_share",
+            target=EntityRef(
+                type="share",
+                value=observation.share,
+            ),
+            timestamp=observation.timestamp,
+        )
+
+    def add_smb_file_operation(
+        self,
+        observation: SMBFileOperation,
+    ) -> None:
+        if not observation.path:
+            return
+
+        self.add(
+            source=EntityRef(
+                type="host",
+                value=observation.source_ip,
+            ),
+            relation="accessed_path",
+            target=EntityRef(
+                type="path",
+                value=observation.path,
+            ),
+            timestamp=observation.timestamp,
         )
 
     def relationships(self) -> list[Relationship]:

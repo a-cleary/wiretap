@@ -20,6 +20,14 @@ from wiretap.models.tls import (
     TLSServerHello,
     TLSTransaction,
 )
+from wiretap.models.smb import (
+    SMBFileOperation,
+    SMBNegotiate,
+    SMBObservation,
+    SMBSessionSetup,
+    SMBTransaction,
+    SMBTreeConnect,
+)
 
 __all__ = [
     "Connection",
@@ -39,4 +47,10 @@ __all__ = [
     "TLSClientHello",
     "TLSServerHello",
     "TLSTransaction",
+    "SMBFileOperation",
+    "SMBNegotiate",
+    "SMBObservation",
+    "SMBSessionSetup",
+    "SMBTransaction",
+    "SMBTreeConnect",
 ]

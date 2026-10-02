@@ -6,6 +6,9 @@ from wiretap.models import (
     Service,
     TLSCertificate,
     TLSTransaction,
+    SMBFileOperation,
+    SMBSessionSetup,
+    SMBTreeConnect,
 )
 
 
@@ -24,6 +27,10 @@ class EntityTracker:
             str,
             TLSCertificate,
         ] = {}
+
+        # Entity types that do not yet have dedicated
+        # domain models.
+        self._entities: set[EntityRef] = set()
 
     def add_flow(self, flow: Flow) -> None:
         self._add_host(
@@ -120,6 +127,56 @@ class EntityTracker:
                 certificate.fingerprint_sha256
             ] = certificate
 
+    def add_smb_session_setup(
+        self,
+        observation: SMBSessionSetup,
+    ) -> None:
+        if not observation.username:
+            return
+
+        identity = observation.username
+
+        if observation.domain:
+            identity = (
+                f"{observation.domain}\\"
+                f"{identity}"
+            )
+
+        self._entities.add(
+            EntityRef(
+                type="identity",
+                value=identity,
+            )
+        )
+
+    def add_smb_tree_connect(
+        self,
+        observation: SMBTreeConnect,
+    ) -> None:
+        if not observation.share:
+            return
+
+        self._entities.add(
+            EntityRef(
+                type="share",
+                value=observation.share,
+            )
+        )
+
+    def add_smb_file_operation(
+        self,
+        observation: SMBFileOperation,
+    ) -> None:
+        if not observation.path:
+            return
+
+        self._entities.add(
+            EntityRef(
+                type="path",
+                value=observation.path,
+            )
+        )
+
     def service_ref(
         self,
         service: Service,
@@ -158,6 +215,33 @@ class EntityTracker:
             type="certificate",
             value=certificate.fingerprint_sha256,
         )
+
+    def refs(self) -> list[EntityRef]:
+        refs: list[EntityRef] = []
+
+        refs.extend(
+            self.host_ref(host)
+            for host in self._hosts.values()
+        )
+
+        refs.extend(
+            self.hostname_ref(hostname)
+            for hostname in self._hostnames.values()
+        )
+
+        refs.extend(
+            self.service_ref(service)
+            for service in self._services.values()
+        )
+
+        refs.extend(
+            self.certificate_ref(certificate)
+            for certificate in self._certificates.values()
+        )
+
+        refs.extend(self._entities)
+
+        return refs
 
     def _add_host(
         self,
