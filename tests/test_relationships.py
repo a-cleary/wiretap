@@ -8,6 +8,7 @@ from wiretap.models import (
     DNSTransaction,
     Endpoint,
     EntityRef,
+    TLSCertificate,
 )
 
 
@@ -362,4 +363,52 @@ def test_relationship_tracker_adds_dns_resolution_relationship():
     assert resolution.target == EntityRef(
         type="host",
         value="10.10.10.20",
+    )
+
+
+def test_tls_certificate_relationship():
+    timestamp = datetime(
+        2026,
+        1,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    tracker = RelationshipTracker()
+
+    certificate = TLSCertificate(
+        timestamp=timestamp,
+        source_ip="10.10.10.20",
+        source_port=443,
+        destination_ip="10.10.10.42",
+        destination_port=49152,
+        fingerprint_sha256="abc123",
+        subject="CN=example.com",
+        issuer="CN=Example CA",
+        serial_number="12345",
+        not_before=timestamp,
+        not_after=timestamp,
+        subject_alt_names=["example.com"],
+    )
+
+    tracker.add_tls_certificate(
+        certificate
+    )
+
+    relationships = tracker.relationships()
+
+    assert len(relationships) == 1
+
+    relationship = relationships[0]
+
+    assert relationship.source.id == (
+        "host:10.10.10.20"
+    )
+
+    assert relationship.relation == (
+        "presented_certificate"
+    )
+
+    assert relationship.target.id == (
+        "certificate:abc123"
     )

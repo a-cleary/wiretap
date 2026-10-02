@@ -19,6 +19,7 @@ from wiretap.models import (
     TLSClientHello,
     TLSServerHello,
     TLSTransaction,
+    TLSCertificate,
 )
 from wiretap.output.timeline import (
     TimelineRecord,
@@ -37,6 +38,7 @@ from wiretap.output.timeline import (
     tls_client_hello_to_timeline,
     tls_server_hello_to_timeline,
     tls_transaction_to_timeline,
+    tls_certificate_to_timeline,
 )
 
 
@@ -538,3 +540,35 @@ def test_sort_timeline():
         earlier,
         later,
     ]
+
+
+def test_tls_certificate_to_timeline():
+    certificate = TLSCertificate(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.20",
+        source_port=443,
+        destination_ip="10.10.10.42",
+        destination_port=49152,
+        fingerprint_sha256="abc123",
+        subject="CN=example.com",
+        issuer="CN=Example CA",
+        serial_number="12345",
+        not_before=TIMESTAMP,
+        not_after=TIMESTAMP,
+        subject_alt_names=["example.com"],
+    )
+
+    record = tls_certificate_to_timeline(
+        certificate
+    )
+
+    assert record.timestamp == TIMESTAMP
+
+    assert record.record_type == (
+        "tls_certificate"
+    )
+
+    assert (
+        record.data["fingerprint_sha256"]
+        == "abc123"
+    )

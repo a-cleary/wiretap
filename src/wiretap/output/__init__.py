@@ -25,6 +25,8 @@ from wiretap.output.jsonl import (
     tls_client_hello_to_dict,
     tls_server_hello_to_dict,
     tls_transaction_to_dict,
+    tls_certificate_to_dict,
+    serialize_tls_certificate,
 )
 
 from wiretap.output.timeline import (
@@ -43,6 +45,7 @@ from wiretap.output.timeline import (
     tls_client_hello_to_timeline,
     tls_server_hello_to_timeline,
     tls_transaction_to_timeline,
+    tls_certificate_to_timeline,
 )
 
 __all__ = [
@@ -87,4 +90,7 @@ __all__ = [
     "tls_client_hello_to_timeline",
     "tls_server_hello_to_timeline",
     "tls_transaction_to_timeline",
+    "tls_certificate_to_dict",
+    "serialize_tls_certificate",
+    "tls_certificate_to_timeline",
 ]

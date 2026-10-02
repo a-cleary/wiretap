@@ -15,6 +15,7 @@ from wiretap.models import (
     TLSClientHello,
     TLSServerHello,
     TLSTransaction,
+    TLSCertificate,
 )
 from wiretap.output.jsonl import (
     connection_to_dict,
@@ -30,6 +31,7 @@ from wiretap.output.jsonl import (
     tls_client_hello_to_dict,
     tls_server_hello_to_dict,
     tls_transaction_to_dict,
+    tls_certificate_to_dict,
 )
 
 
@@ -171,6 +173,14 @@ def observation_to_timeline(
             observation
         )
 
+    if isinstance(
+        observation,
+        TLSCertificate,
+    ):
+        return tls_certificate_to_timeline(
+            observation
+        )
+
     raise TypeError(
         f"Unsupported observation type: "
         f"{type(observation).__name__}"
@@ -222,4 +232,16 @@ def tls_transaction_to_timeline(
         timestamp=timestamp,
         record_type="tls_transaction",
         data=tls_transaction_to_dict(transaction),
+    )
+
+
+def tls_certificate_to_timeline(
+    certificate: TLSCertificate,
+) -> TimelineRecord:
+    return TimelineRecord(
+        timestamp=certificate.timestamp,
+        record_type="tls_certificate",
+        data=tls_certificate_to_dict(
+            certificate
+        ),
     )

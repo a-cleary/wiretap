@@ -17,6 +17,7 @@ from wiretap.models import (
     TLSClientHello,
     TLSServerHello,
     TLSTransaction,
+    TLSCertificate,
 )
 from wiretap.output.jsonl import (
     connection_to_dict,
@@ -45,6 +46,8 @@ from wiretap.output.jsonl import (
     tls_client_hello_to_dict,
     tls_server_hello_to_dict,
     tls_transaction_to_dict,
+    serialize_tls_certificate,
+    tls_certificate_to_dict,
 )
 from wiretap.capture.flow import Flow
 
@@ -744,3 +747,79 @@ def test_tls_transaction_serializes_as_json():
     assert parsed["type"] == "tls_transaction"
     assert parsed["client_hello"] is not None
     assert parsed["server_hello"] is not None
+
+
+def test_tls_certificate_to_dict():
+    certificate = TLSCertificate(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.20",
+        source_port=443,
+        destination_ip="10.10.10.42",
+        destination_port=49152,
+        fingerprint_sha256="abc123",
+        subject="CN=example.com",
+        issuer="CN=Example CA",
+        serial_number="12345",
+        not_before=TIMESTAMP,
+        not_after=TIMESTAMP,
+        subject_alt_names=[
+            "example.com",
+            "www.example.com",
+        ],
+    )
+
+    result = tls_certificate_to_dict(
+        certificate
+    )
+
+    assert result["type"] == (
+        "tls_certificate"
+    )
+
+    assert result["fingerprint_sha256"] == (
+        "abc123"
+    )
+
+    assert result["subject"] == (
+        "CN=example.com"
+    )
+
+    assert result["issuer"] == (
+        "CN=Example CA"
+    )
+
+    assert result["subject_alt_names"] == [
+        "example.com",
+        "www.example.com",
+    ]
+
+
+def test_tls_certificate_serializes_as_json():
+    certificate = TLSCertificate(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.20",
+        source_port=443,
+        destination_ip="10.10.10.42",
+        destination_port=49152,
+        fingerprint_sha256="abc123",
+        subject="CN=example.com",
+        issuer="CN=Example CA",
+        serial_number="12345",
+        not_before=TIMESTAMP,
+        not_after=TIMESTAMP,
+        subject_alt_names=["example.com"],
+    )
+
+    result = serialize_tls_certificate(
+        certificate
+    )
+
+    parsed = json.loads(result)
+
+    assert parsed["type"] == (
+        "tls_certificate"
+    )
+
+    assert parsed["fingerprint_sha256"] == (
+        "abc123"
+    )

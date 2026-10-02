@@ -5,6 +5,7 @@ from wiretap.capture.flow import Flow
 from wiretap.models import (
     Endpoint,
     EntityRef,
+    TLSCertificate,
 )
 
 def make_flow(
@@ -380,3 +381,48 @@ def test_entity_tracker_creates_service_entity_ref():
     )
 
     assert service_ref.id == "service:tcp/80"
+
+
+def test_entity_tracker_creates_certificate_ref():
+    timestamp = datetime(
+        2026,
+        1,
+        1,
+        0,
+        0,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    tracker = EntityTracker()
+
+    certificate = TLSCertificate(
+        timestamp=timestamp,
+        source_ip="10.10.10.20",
+        source_port=443,
+        destination_ip="10.10.10.42",
+        destination_port=49152,
+        fingerprint_sha256="abc123",
+        subject="CN=example.com",
+        issuer="CN=Example CA",
+        serial_number="12345",
+        not_before=timestamp,
+        not_after=timestamp,
+        subject_alt_names=["example.com"],
+    )
+
+    tracker.add_tls_certificate(
+        certificate
+    )
+
+    certificates = tracker.certificates()
+
+    assert len(certificates) == 1
+
+    certificate_ref = tracker.certificate_ref(
+        certificates[0]
+    )
+
+    assert certificate_ref.id == (
+        "certificate:abc123"
+    )

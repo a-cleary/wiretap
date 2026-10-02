@@ -3,6 +3,7 @@ from wiretap.models import (
     DNSTransaction,
     EntityRef,
     Relationship,
+    TLSCertificate,
     TLSTransaction,
 )
 
@@ -154,6 +155,25 @@ class RelationshipTracker:
                 value=hello.server_name,
             ),
             timestamp=hello.timestamp,
+        )
+
+    def add_tls_certificate(
+        self,
+        certificate: TLSCertificate,
+    ) -> None:
+        certificate_ref = EntityRef(
+            type="certificate",
+            value=certificate.fingerprint_sha256,
+        )
+
+        self.add(
+            source=EntityRef(
+                type="host",
+                value=certificate.source_ip,
+            ),
+            relation="presented_certificate",
+            target=certificate_ref,
+            timestamp=certificate.timestamp,
         )
 
     def relationships(self) -> list[Relationship]:

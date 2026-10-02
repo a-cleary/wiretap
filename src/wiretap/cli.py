@@ -13,6 +13,7 @@ from wiretap.output.timeline import (
     service_to_timeline,
     sort_timeline,
     tls_transaction_to_timeline,
+    tls_certificate_to_timeline,
 )
 
 

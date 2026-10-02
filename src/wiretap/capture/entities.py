@@ -4,7 +4,7 @@ from wiretap.models import (
     Host,
     Hostname,
     Service,
-    TLSClientHello,
+    TLSCertificate,
     TLSTransaction,
 )
 
@@ -18,6 +18,11 @@ class EntityTracker:
         self._services: dict[
             tuple[str, int, str],
             Service,
+        ] = {}
+
+        self._certificates: dict[
+            str,
+            TLSCertificate,
         ] = {}
 
     def add_flow(self, flow: Flow) -> None:
@@ -96,6 +101,25 @@ class EntityTracker:
             hello.timestamp,
         )
 
+    def add_tls_certificate(
+        self,
+        certificate: TLSCertificate,
+    ) -> None:
+        existing = self._certificates.get(
+            certificate.fingerprint_sha256
+        )
+
+        if existing is None:
+            self._certificates[
+                certificate.fingerprint_sha256
+            ] = certificate
+            return
+
+        if existing.timestamp > certificate.timestamp:
+            self._certificates[
+                certificate.fingerprint_sha256
+            ] = certificate
+
     def service_ref(
         self,
         service: Service,
@@ -124,6 +148,15 @@ class EntityTracker:
         return EntityRef(
             type="hostname",
             value=hostname.name,
+        )
+
+    def certificate_ref(
+        self,
+        certificate: TLSCertificate,
+    ) -> EntityRef:
+        return EntityRef(
+            type="certificate",
+            value=certificate.fingerprint_sha256,
         )
 
     def _add_host(
@@ -222,3 +255,8 @@ class EntityTracker:
 
     def services(self) -> list[Service]:
         return list(self._services.values())
+
+    def certificates(self) -> list[TLSCertificate]:
+        return list(
+            self._certificates.values()
+        )

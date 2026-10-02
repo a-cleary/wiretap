@@ -16,6 +16,7 @@ from wiretap.models import (
     TLSClientHello,
     TLSServerHello,
     TLSTransaction,
+    TLSCertificate,
 )
 
 
@@ -456,6 +457,52 @@ def serialize_tls_transaction(
 ) -> str:
     return json.dumps(
         tls_transaction_to_dict(transaction),
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def tls_certificate_to_dict(
+    certificate: TLSCertificate,
+) -> dict[str, Any]:
+    return {
+        "type": "tls_certificate",
+        "timestamp": _timestamp(
+            certificate.timestamp
+        ),
+        "source_ip": certificate.source_ip,
+        "source_port": certificate.source_port,
+        "destination_ip": certificate.destination_ip,
+        "destination_port": certificate.destination_port,
+        "fingerprint_sha256": (
+            certificate.fingerprint_sha256
+        ),
+        "subject": certificate.subject,
+        "issuer": certificate.issuer,
+        "serial_number": certificate.serial_number,
+        "not_before": (
+            _timestamp(certificate.not_before)
+            if certificate.not_before is not None
+            else None
+        ),
+        "not_after": (
+            _timestamp(certificate.not_after)
+            if certificate.not_after is not None
+            else None
+        ),
+        "subject_alt_names": (
+            certificate.subject_alt_names
+        ),
+    }
+
+
+def serialize_tls_certificate(
+    certificate: TLSCertificate,
+) -> str:
+    return json.dumps(
+        tls_certificate_to_dict(
+            certificate
+        ),
         separators=(",", ":"),
         sort_keys=True,
     )

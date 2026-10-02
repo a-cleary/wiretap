@@ -28,6 +28,22 @@ class TLSServerHello:
 
 
 @dataclass
+class TLSCertificate:
+    timestamp: datetime
+    source_ip: str
+    source_port: int | None
+    destination_ip: str
+    destination_port: int | None
+    fingerprint_sha256: str
+    subject: str | None
+    issuer: str | None
+    serial_number: str | None
+    not_before: datetime | None
+    not_after: datetime | None
+    subject_alt_names: list[str]
+
+
+@dataclass
 class TLSTransaction:
     client_hello: TLSClientHello | None = None
     server_hello: TLSServerHello | None = None

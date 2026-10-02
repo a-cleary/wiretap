@@ -19,6 +19,7 @@ from wiretap.models import (
     DNSQuery,
     HTTPRequest,
     HTTPResponse,
+    TLSCertificate,
     TLSClientHello,
     TLSServerHello,
 )
@@ -78,6 +79,17 @@ class CaptureProcessor:
                 TLSServerHello,
             ):
                 self.tls_tracker.add_server_hello(
+                    observation
+                )
+
+            elif isinstance(
+                observation,
+                TLSCertificate,
+            ):
+                self.entity_tracker.add_tls_certificate(
+                    observation
+                )
+                self.relationship_tracker.add_tls_certificate(
                     observation
                 )
 
