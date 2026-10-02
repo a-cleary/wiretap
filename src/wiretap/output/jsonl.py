@@ -286,9 +286,11 @@ def relationship_to_dict(
         "last_seen": _timestamp(
             relationship.last_seen
         ),
-        "source": relationship.source,
+        "source": relationship.source.id,
+        "source_type": relationship.source.type,
+        "target": relationship.target.id,
+        "target_type": relationship.target.type,
         "relation": relationship.relation,
-        "target": relationship.target,
     }
 
 

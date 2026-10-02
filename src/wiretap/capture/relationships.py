@@ -1,19 +1,23 @@
 from wiretap.capture.flow import Flow
-from wiretap.models import DNSTransaction, Relationship
+from wiretap.models import (
+    DNSTransaction,
+    EntityRef,
+    Relationship,
+)
 
 
 class RelationshipTracker:
     def __init__(self) -> None:
         self._relationships: dict[
-            tuple[str, str, str],
+            tuple[EntityRef, str, EntityRef],
             Relationship,
         ] = {}
 
     def add(
         self,
-        source: str,
+        source: EntityRef,
         relation: str,
-        target: str,
+        target: EntityRef,
         timestamp,
     ) -> None:
         key = (
@@ -56,9 +60,15 @@ class RelationshipTracker:
             return
 
         self.add(
-            source=flow.initiator.ip,
+            source=EntityRef(
+                type="host",
+                value=flow.initiator.ip,
+            ),
             relation="connects_to",
-            target=flow.responder.ip,
+            target=EntityRef(
+                type="host",
+                value=flow.responder.ip,
+            ),
             timestamp=flow.first_seen,
         )
 
@@ -69,28 +79,34 @@ class RelationshipTracker:
         query = transaction.query
 
         self.add(
-            source=query.source_ip,
+            source=EntityRef(
+                type="host",
+                value=query.source_ip,
+            ),
             relation="queried",
-            target=query.query,
+            target=EntityRef(
+                type="hostname",
+                value=query.query,
+            ),
             timestamp=query.timestamp,
         )
 
         for answer in transaction.answers:
-            if answer.record_type == "A":
-                self.add(
-                    source=answer.name,
-                    relation="resolves_to",
-                    target=answer.value,
-                    timestamp=transaction.timestamp,
-                )
+            if answer.record_type not in {"A", "AAAA"}:
+                continue
 
-            elif answer.record_type == "AAAA":
-                self.add(
-                    source=answer.name,
-                    relation="resolves_to",
-                    target=answer.value,
-                    timestamp=transaction.timestamp,
-                )
+            self.add(
+                source=EntityRef(
+                    type="hostname",
+                    value=answer.name,
+                ),
+                relation="resolves_to",
+                target=EntityRef(
+                    type="host",
+                    value=answer.value,
+                ),
+                timestamp=transaction.timestamp,
+            )
 
     def relationships(self) -> list[Relationship]:
         return list(self._relationships.values())

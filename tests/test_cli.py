@@ -34,6 +34,8 @@ def test_cli_outputs_jsonl(test_pcap, monkeypatch, capsys):
     assert record_types.count("http_request") == 1
     assert record_types.count("http_response") == 1
     assert record_types.count("http_transaction") == 1
+    assert record_types.count("hostname") == 1
+    assert record_types.count("relationship") == 5
 
     transactions = [
         record
@@ -46,11 +48,15 @@ def test_cli_outputs_jsonl(test_pcap, monkeypatch, capsys):
     transaction = transactions[0]
 
     assert transaction["request"]["method"] == "GET"
-    assert transaction["request"]["host"] == "fileserver.corp.local"
+    assert transaction["request"]["host"] == (
+        "fileserver.corp.local"
+    )
     assert transaction["request"]["path"] == "/admin/login"
 
     assert transaction["response"]["status_code"] == 200
-    assert transaction["response"]["server"] == "nginx/1.24.0"
+    assert transaction["response"]["server"] == (
+        "nginx/1.24.0"
+    )
 
     dns_transactions = [
         record
@@ -76,6 +82,18 @@ def test_cli_outputs_jsonl(test_pcap, monkeypatch, capsys):
         "10.10.10.20"
     )
 
+    hostnames = [
+        record
+        for record in records
+        if record["type"] == "hostname"
+    ]
+
+    assert len(hostnames) == 1
+
+    assert hostnames[0]["name"] == (
+        "fileserver.corp.local"
+    )
+
     relationships = [
         record
         for record in records
@@ -93,40 +111,38 @@ def test_cli_outputs_jsonl(test_pcap, monkeypatch, capsys):
         for relationship in relationships
     } == {
         (
-            "10.10.10.42",
+            "host:10.10.10.42",
             "connects_to",
-            "10.10.10.20",
+            "host:10.10.10.20",
         ),
         (
-            "10.10.10.42",
+            "host:10.10.10.42",
             "connects_to",
-            "10.10.10.30",
+            "host:10.10.10.30",
         ),
         (
-            "10.10.10.42",
+            "host:10.10.10.42",
             "connects_to",
-            "10.10.10.10",
+            "host:10.10.10.10",
         ),
         (
-            "10.10.10.42",
+            "host:10.10.10.42",
             "queried",
-            "fileserver.corp.local",
+            "hostname:fileserver.corp.local",
         ),
         (
-            "fileserver.corp.local",
+            "hostname:fileserver.corp.local",
             "resolves_to",
-            "10.10.10.20",
+            "host:10.10.10.20",
         ),
     }
 
-    hostnames = [
-        record
-        for record in records
-        if record["type"] == "hostname"
-    ]
+    assert all(
+        "source_type" in relationship
+        for relationship in relationships
+    )
 
-    assert len(hostnames) == 1
-
-    assert hostnames[0]["name"] == (
-        "fileserver.corp.local"
+    assert all(
+        "target_type" in relationship
+        for relationship in relationships
     )

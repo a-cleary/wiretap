@@ -7,6 +7,8 @@ from wiretap.models import (
     HTTPRequest,
     HTTPResponse,
     HTTPTransaction,
+    Relationship,
+    EntityRef,
 )
 from wiretap.output.timeline import (
     dns_to_timeline,
@@ -295,9 +297,15 @@ def test_relationship_to_timeline():
     )
 
     relationship = Relationship(
-        source="10.10.10.42",
+        source=EntityRef(
+            type="host",
+            value="10.10.10.42",
+        ),
         relation="queried",
-        target="fileserver.corp.local",
+        target=EntityRef(
+            type="hostname",
+            value="fileserver.corp.local",
+        ),
         first_seen=timestamp,
         last_seen=timestamp,
     )

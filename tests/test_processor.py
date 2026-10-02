@@ -1,6 +1,6 @@
 from wiretap.capture import CaptureProcessor
 from wiretap.capture.reader import PcapReader
-from wiretap.models import DNSQuery
+from wiretap.models import DNSQuery, EntityRef
 
 
 def test_capture_processor_collects_observations(test_pcap):
@@ -161,19 +161,37 @@ def test_capture_processor_discovers_connections(test_pcap):
 
     assert connections == {
         (
-            "10.10.10.42",
+            EntityRef(
+                type="host",
+                value="10.10.10.42",
+            ),
             "connects_to",
-            "10.10.10.20",
+            EntityRef(
+                type="host",
+                value="10.10.10.20",
+            ),
         ),
         (
-            "10.10.10.42",
+            EntityRef(
+                type="host",
+                value="10.10.10.42",
+            ),
             "connects_to",
-            "10.10.10.30",
+            EntityRef(
+                type="host",
+                value="10.10.10.30",
+            ),
         ),
         (
-            "10.10.10.42",
+            EntityRef(
+                type="host",
+                value="10.10.10.42",
+            ),
             "connects_to",
-            "10.10.10.10",
+            EntityRef(
+                type="host",
+                value="10.10.10.10",
+            ),
         ),
     }
 
@@ -205,14 +223,26 @@ def test_capture_processor_discovers_dns_relationships(test_pcap):
 
     assert dns_relationships == {
         (
-            "10.10.10.42",
+            EntityRef(
+                type="host",
+                value="10.10.10.42",
+            ),
             "queried",
-            "fileserver.corp.local",
+            EntityRef(
+                type="hostname",
+                value="fileserver.corp.local",
+            ),
         ),
         (
-            "fileserver.corp.local",
+            EntityRef(
+                type="hostname",
+                value="fileserver.corp.local",
+            ),
             "resolves_to",
-            "10.10.10.20",
+            EntityRef(
+                type="host",
+                value="10.10.10.20",
+            ),
         ),
     }
 
