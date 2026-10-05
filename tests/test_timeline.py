@@ -20,6 +20,10 @@ from wiretap.models import (
     TLSServerHello,
     TLSTransaction,
     TLSCertificate,
+    SMBFileOperation,
+    SMBSessionSetup,
+    SMBTreeConnect,
+    SMBTransaction,
 )
 from wiretap.output.timeline import (
     TimelineRecord,
@@ -39,6 +43,10 @@ from wiretap.output.timeline import (
     tls_server_hello_to_timeline,
     tls_transaction_to_timeline,
     tls_certificate_to_timeline,
+    smb_file_operation_to_timeline,
+    smb_session_setup_to_timeline,
+    smb_tree_connect_to_timeline,
+    smb_transaction_to_timeline,
 )
 
 
@@ -571,4 +579,267 @@ def test_tls_certificate_to_timeline():
     assert (
         record.data["fingerprint_sha256"]
         == "abc123"
+    )
+
+
+def test_smb_session_setup_to_timeline():
+    observation = SMBSessionSetup(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="SESSION_SETUP",
+        message_type="request",
+        message_id=1,
+        session_id=123,
+        username="alice",
+        domain="CORP",
+        workstation="WS01",
+    )
+
+    result = smb_session_setup_to_timeline(
+        observation
+    )
+
+    assert result.timestamp == TIMESTAMP
+    assert result.record_type == (
+        "smb_session_setup"
+    )
+
+    assert result.data["type"] == (
+        "smb_session_setup"
+    )
+
+    assert result.data["identity"] == (
+        r"CORP\alice"
+    )
+
+
+def test_smb_tree_connect_to_timeline():
+    observation = SMBTreeConnect(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="TREE_CONNECT",
+        message_type="request",
+        message_id=2,
+        session_id=123,
+        tree_id=456,
+        share=r"\\10.10.10.30\ADMIN$",
+        share_type=None,
+    )
+
+    result = smb_tree_connect_to_timeline(
+        observation
+    )
+
+    assert result.timestamp == TIMESTAMP
+    assert result.record_type == (
+        "smb_tree_connect"
+    )
+
+    assert result.data["type"] == (
+        "smb_tree_connect"
+    )
+
+    assert result.data["share"] == (
+        r"\\10.10.10.30\ADMIN$"
+    )
+
+
+def test_smb_file_operation_to_timeline():
+    operation = SMBFileOperation(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="WRITE",
+        message_type="request",
+        message_id=11,
+        session_id=123,
+        tree_id=456,
+        operation="WRITE",
+        file_id=(
+            "00112233445566778899aabbccddeeff"
+        ),
+        resolved_path=r"\Temp\payload.exe",
+        offset=16384,
+        length=2048,
+        identity=r"CORP\alice",
+        share=r"\\10.10.10.30\ADMIN$",
+    )
+
+    result = smb_file_operation_to_timeline(
+        operation
+    )
+
+    assert result.timestamp == TIMESTAMP
+    assert result.record_type == (
+        "smb_file_operation"
+    )
+
+    assert result.data["type"] == (
+        "smb_file_operation"
+    )
+
+    assert result.data["operation"] == "WRITE"
+    assert result.data["resolved_path"] == (
+        r"\Temp\payload.exe"
+    )
+    assert result.data["offset"] == 16384
+    assert result.data["length"] == 2048
+    assert result.data["identity"] == (
+        r"CORP\alice"
+    )
+    assert result.data["share"] == (
+        r"\\10.10.10.30\ADMIN$"
+    )
+
+
+def test_observation_to_timeline_supports_smb():
+    session_setup = SMBSessionSetup(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="SESSION_SETUP",
+        message_type="request",
+        message_id=1,
+        session_id=123,
+        username="alice",
+        domain="CORP",
+        workstation="WS01",
+    )
+
+    tree_connect = SMBTreeConnect(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="TREE_CONNECT",
+        message_type="request",
+        message_id=2,
+        session_id=123,
+        tree_id=456,
+        share=r"\\10.10.10.30\ADMIN$",
+        share_type=None,
+    )
+
+    file_operation = SMBFileOperation(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="WRITE",
+        message_type="request",
+        message_id=11,
+        session_id=123,
+        tree_id=456,
+        operation="WRITE",
+        file_id=(
+            "00112233445566778899aabbccddeeff"
+        ),
+        resolved_path=r"\Temp\payload.exe",
+        offset=16384,
+        length=2048,
+        identity=r"CORP\alice",
+        share=r"\\10.10.10.30\ADMIN$",
+    )
+
+    assert (
+        observation_to_timeline(
+            session_setup
+        ).record_type
+        == "smb_session_setup"
+    )
+
+    assert (
+        observation_to_timeline(
+            tree_connect
+        ).record_type
+        == "smb_tree_connect"
+    )
+
+    assert (
+        observation_to_timeline(
+            file_operation
+        ).record_type
+        == "smb_file_operation"
+    )
+
+
+def test_smb_transaction_to_timeline():
+    request = SMBTreeConnect(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="TREE_CONNECT",
+        message_type="request",
+        message_id=2,
+        session_id=123,
+        tree_id=456,
+        share=r"\\10.10.10.30\ADMIN$",
+        share_type=None,
+    )
+
+    response = SMBTreeConnect(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.30",
+        source_port=445,
+        destination_ip="10.10.10.42",
+        destination_port=49152,
+        version="SMB3",
+        command="TREE_CONNECT",
+        message_type="response",
+        message_id=2,
+        session_id=123,
+        tree_id=456,
+        share=r"\\10.10.10.30\ADMIN$",
+        share_type="DISK",
+    )
+
+    transaction = SMBTransaction(
+        request=request,
+        response=response,
+    )
+
+    result = smb_transaction_to_timeline(
+        transaction
+    )
+
+    assert result.timestamp == TIMESTAMP
+
+    assert result.record_type == (
+        "smb_transaction"
+    )
+
+    assert result.data["type"] == (
+        "smb_transaction"
+    )
+
+    assert result.data["request"] is not None
+    assert result.data["response"] is not None
+
+    assert result.data["request"]["message_type"] == (
+        "request"
+    )
+
+    assert result.data["response"]["message_type"] == (
+        "response"
     )

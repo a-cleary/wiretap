@@ -412,3 +412,207 @@ def test_tls_certificate_relationship():
     assert relationship.target.id == (
         "certificate:abc123"
     )
+
+
+from datetime import datetime, timezone
+
+from wiretap.capture.relationships import RelationshipTracker
+from wiretap.models import SMBFileOperation
+
+
+def test_smb_read_uses_resolved_path():
+    timestamp = datetime(
+        2026,
+        1,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    tracker = RelationshipTracker()
+
+    observation = SMBFileOperation(
+        timestamp=timestamp,
+        source_ip="10.0.0.10",
+        source_port=49152,
+        destination_ip="10.0.0.20",
+        destination_port=445,
+        version="SMB3",
+        command="READ",
+        message_type="request",
+        message_id=1,
+        operation="READ",
+        file_id="aa" * 16,
+        resolved_path=r"\share\secret.txt",
+    )
+
+    tracker.add_smb_file_operation(
+        observation
+    )
+
+    relationships = tracker.relationships()
+
+    assert len(relationships) == 1
+
+    relationship = relationships[0]
+
+    assert relationship.source.type == "host"
+    assert relationship.source.value == "10.0.0.10"
+
+    assert relationship.relation == "reads_from"
+
+    assert relationship.target.type == "path"
+    assert relationship.target.value == r"\share\secret.txt"
+
+
+def test_smb_write_uses_resolved_path():
+    timestamp = datetime(
+        2026,
+        1,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    tracker = RelationshipTracker()
+
+    observation = SMBFileOperation(
+        timestamp=timestamp,
+        source_ip="10.0.0.10",
+        source_port=49152,
+        destination_ip="10.0.0.20",
+        destination_port=445,
+        version="SMB3",
+        command="WRITE",
+        message_type="request",
+        message_id=2,
+        operation="WRITE",
+        file_id="bb" * 16,
+        resolved_path=r"\share\payload.exe",
+    )
+
+    tracker.add_smb_file_operation(
+        observation
+    )
+
+    relationships = tracker.relationships()
+
+    assert len(relationships) == 1
+
+    relationship = relationships[0]
+
+    assert relationship.relation == "writes_to"
+    assert relationship.target.value == r"\share\payload.exe"
+
+
+def test_smb_create_uses_original_path():
+    timestamp = datetime(
+        2026,
+        1,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    tracker = RelationshipTracker()
+
+    observation = SMBFileOperation(
+        timestamp=timestamp,
+        source_ip="10.0.0.10",
+        source_port=49152,
+        destination_ip="10.0.0.20",
+        destination_port=445,
+        version="SMB3",
+        command="CREATE",
+        message_type="request",
+        message_id=3,
+        operation="CREATE",
+        path=r"\share\payload.exe",
+    )
+
+    tracker.add_smb_file_operation(
+        observation
+    )
+
+    relationships = tracker.relationships()
+
+    assert len(relationships) == 1
+
+    relationship = relationships[0]
+
+    assert relationship.relation == "created_path"
+    assert relationship.target.value == r"\share\payload.exe"
+
+
+def test_smb_close_uses_resolved_path():
+    timestamp = datetime(
+        2026,
+        1,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    tracker = RelationshipTracker()
+
+    observation = SMBFileOperation(
+        timestamp=timestamp,
+        source_ip="10.0.0.10",
+        source_port=49152,
+        destination_ip="10.0.0.20",
+        destination_port=445,
+        version="SMB3",
+        command="CLOSE",
+        message_type="request",
+        message_id=4,
+        operation="CLOSE",
+        file_id="cc" * 16,
+        resolved_path=r"\share\payload.exe",
+    )
+
+    tracker.add_smb_file_operation(
+        observation
+    )
+
+    relationships = tracker.relationships()
+
+    assert len(relationships) == 1
+
+    relationship = relationships[0]
+
+    assert relationship.relation == "closed_path"
+    assert relationship.target.value == r"\share\payload.exe"
+
+
+def test_smb_unknown_operation_uses_accessed_path():
+    timestamp = datetime(
+        2026,
+        1,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    tracker = RelationshipTracker()
+
+    observation = SMBFileOperation(
+        timestamp=timestamp,
+        source_ip="10.0.0.10",
+        source_port=49152,
+        destination_ip="10.0.0.20",
+        destination_port=445,
+        version="SMB3",
+        command="QUERY_INFO",
+        message_type="request",
+        message_id=5,
+        operation="QUERY_INFO",
+        path=r"\share\file.txt",
+    )
+
+    tracker.add_smb_file_operation(
+        observation
+    )
+
+    relationships = tracker.relationships()
+
+    assert len(relationships) == 1
+
+    relationship = relationships[0]
+
+    assert relationship.relation == "accessed_path"
+    assert relationship.target.value == r"\share\file.txt"

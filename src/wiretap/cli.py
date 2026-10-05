@@ -14,6 +14,7 @@ from wiretap.output.timeline import (
     sort_timeline,
     tls_transaction_to_timeline,
     tls_certificate_to_timeline,
+    smb_transaction_to_timeline
 )
 
 
@@ -64,6 +65,15 @@ def main() -> None:
             timeline.append(
                 observation_to_timeline(
                     observation
+                )
+            )
+
+        for transaction in (
+            processor.smb_tracker.transactions()
+        ):
+            timeline.append(
+                smb_transaction_to_timeline(
+                    transaction
                 )
             )
 

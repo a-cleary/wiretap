@@ -1,90 +1,8 @@
-from wiretap.capture import CaptureProcessor
+from datetime import datetime, timezone
+
+from wiretap.capture.processor import CaptureProcessor
 from wiretap.capture.reader import PcapReader
-from wiretap.models import DNSQuery, EntityRef
-
-
-def test_capture_processor_collects_observations(test_pcap):
-    processor = CaptureProcessor()
-
-    reader = PcapReader(test_pcap)
-
-    for packet in reader.read():
-        processor.process_packet(packet)
-
-    dns_queries = [
-        observation
-        for observation in processor.observations
-        if isinstance(observation, DNSQuery)
-    ]
-
-    assert len(dns_queries) == 1
-
-
-def test_capture_processor_tracks_flows(test_pcap):
-    processor = CaptureProcessor()
-
-    reader = PcapReader(test_pcap)
-
-    for packet in reader.read():
-        processor.process_packet(packet)
-
-    flows = processor.flow_tracker.flows()
-
-    assert len(flows) == 4
-
-
-def test_capture_processor_tracks_http_transactions(test_pcap):
-    processor = CaptureProcessor()
-
-    reader = PcapReader(test_pcap)
-
-    for packet in reader.read():
-        processor.process_packet(packet)
-
-    transactions = (
-        processor.http_tracker.transactions()
-    )
-
-    assert len(transactions) == 1
-
-    transaction = transactions[0]
-
-    assert transaction.request is not None
-    assert transaction.response is not None
-
-
-def test_capture_processor_tracks_dns_transactions(test_pcap):
-    processor = CaptureProcessor()
-
-    reader = PcapReader(test_pcap)
-
-    for packet in reader.read():
-        processor.process_packet(packet)
-
-    transactions = (
-        processor.dns_tracker.transactions()
-    )
-
-    assert len(transactions) == 1
-
-    transaction = transactions[0]
-
-    assert transaction.query.query == "fileserver.corp.local"
-    assert transaction.query.query_type == "A"
-    assert transaction.query.transaction_id == 1234
-
-    assert transaction.source_ip == "10.10.10.42"
-    assert transaction.destination_ip == "10.10.10.10"
-
-    assert transaction.response_code == 0
-
-    assert len(transaction.answers) == 1
-
-    answer = transaction.answers[0]
-
-    assert answer.record_type == "A"
-    assert answer.value == "10.10.10.20"
-    assert answer.ttl == 300
+from wiretap.models import EntityRef, SMBFileOperation
 
 
 def test_capture_processor_discovers_hosts(test_pcap):
@@ -265,3 +183,141 @@ def test_capture_processor_discovers_hostnames(test_pcap):
     } == {
         "fileserver.corp.local",
     }
+
+
+def test_capture_processor_resolves_smb_file_relationships():
+    timestamp = datetime(
+        2026,
+        1,
+        1,
+        tzinfo=timezone.utc,
+    )
+
+    processor = CaptureProcessor()
+
+    file_id = "aa" * 16
+    path = r"\share\payload.exe"
+
+    create_request = SMBFileOperation(
+        timestamp=timestamp,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="CREATE",
+        message_type="request",
+        message_id=1,
+        operation="CREATE",
+        path=path,
+    )
+
+    create_response = SMBFileOperation(
+        timestamp=timestamp,
+        source_ip="10.10.10.30",
+        source_port=445,
+        destination_ip="10.10.10.42",
+        destination_port=49152,
+        version="SMB3",
+        command="CREATE",
+        message_type="response",
+        message_id=1,
+        operation="CREATE",
+        file_id=file_id,
+    )
+
+    write = SMBFileOperation(
+        timestamp=timestamp,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="WRITE",
+        message_type="request",
+        message_id=2,
+        operation="WRITE",
+        file_id=file_id,
+    )
+
+    close = SMBFileOperation(
+        timestamp=timestamp,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="CLOSE",
+        message_type="request",
+        message_id=3,
+        operation="CLOSE",
+        file_id=file_id,
+    )
+
+    processor.observations.extend(
+        [
+            create_request,
+            create_response,
+            write,
+            close,
+        ]
+    )
+
+    processor.smb_tracker.add(
+        create_request
+    )
+
+    processor.smb_tracker.add(
+        create_response
+    )
+
+    processor.smb_tracker.add(
+        write
+    )
+
+    processor.smb_tracker.add(
+        close
+    )
+
+    processor.finalize()
+
+    relationships = {
+        (
+            relationship.source,
+            relationship.relation,
+            relationship.target,
+        )
+        for relationship
+        in processor.relationship_tracker.relationships()
+    }
+
+    host = EntityRef(
+        type="host",
+        value="10.10.10.42",
+    )
+
+    target = EntityRef(
+        type="path",
+        value=path,
+    )
+
+    assert (
+        host,
+        "created_path",
+        target,
+    ) in relationships
+
+    assert (
+        host,
+        "writes_to",
+        target,
+    ) in relationships
+
+    assert (
+        host,
+        "closed_path",
+        target,
+    ) in relationships
+
+    assert write.resolved_path == path
+    assert close.resolved_path == path

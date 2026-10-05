@@ -26,10 +26,10 @@ SMB2_COMMANDS = {
     0x0006: "CLOSE",
     0x0008: "READ",
     0x0009: "WRITE",
-    0x000a: "LOCK",
-    0x000b: "IOCTL",
-    0x000c: "CANCEL",
-    0x000d: "ECHO",
+    0x000A: "LOCK",
+    0x000B: "IOCTL",
+    0x000C: "CANCEL",
+    0x000D: "ECHO",
     0x0010: "QUERY_DIRECTORY",
     0x0011: "CHANGE_NOTIFY",
     0x0012: "QUERY_INFO",
@@ -42,8 +42,8 @@ SMB1_COMMANDS = {
     0x73: "SESSION_SETUP",
     0x75: "TREE_CONNECT",
     0xA2: "NT_CREATE_ANDX",
-    0x2e: "READ_ANDX",
-    0x2f: "WRITE_ANDX",
+    0x2E: "READ_ANDX",
+    0x2F: "WRITE_ANDX",
     0x04: "CLOSE",
 }
 
@@ -268,7 +268,7 @@ def _parse_smb2_command(
     if command == "CLOSE":
         return _parse_close(
             data,
-            base
+            base,
         )
 
     if command in {
@@ -373,8 +373,7 @@ def _parse_read(
     base: SMBObservation,
 ) -> SMBFileOperation:
     """
-    Extract the FileId, length, and offset from
-    an SMB2 READ request.
+    Extract FileId, length, and offset from an SMB2 READ request.
 
     SMB2 READ request fields begin at byte 64.
 
@@ -384,13 +383,13 @@ def _parse_read(
     """
 
     file_id = None
-    offset = None
     length = None
+    offset = None
 
     if base.message_type == "request":
+        file_id = _extract_read_file_id(data)
         length = _extract_read_length(data)
         offset = _extract_read_offset(data)
-        file_id = _extract_read_file_id(data)
 
     return SMBFileOperation(
         **base.__dict__,
@@ -400,9 +399,32 @@ def _parse_read(
         length=length,
     )
 
+
+def _extract_read_file_id(
+    data: bytes,
+) -> str | None:
+    """
+    Extract the 16-byte SMB2 READ request FileId.
+    """
+
+    if len(data) < 96:
+        return None
+
+    file_id = data[80:96]
+
+    if len(file_id) != 16:
+        return None
+
+    return file_id.hex()
+
+
 def _extract_read_length(
     data: bytes,
 ) -> int | None:
+    """
+    Extract the number of bytes requested by an SMB2 READ.
+    """
+
     if len(data) < 72:
         return None
 
@@ -415,6 +437,10 @@ def _extract_read_length(
 def _extract_read_offset(
     data: bytes,
 ) -> int | None:
+    """
+    Extract the file offset requested by an SMB2 READ.
+    """
+
     if len(data) < 80:
         return None
 
@@ -424,11 +450,117 @@ def _extract_read_offset(
     )
 
 
-def _extract_read_file_id(
+def _parse_write(
+    data: bytes,
+    base: SMBObservation,
+) -> SMBFileOperation:
+    """
+    Extract FileId, length, and offset from an SMB2 WRITE request.
+
+    SMB2 WRITE request fields begin at byte 64.
+
+    Length: 68:72
+    Offset: 72:80
+    FileId: 80:96
+    """
+
+    file_id = None
+    length = None
+    offset = None
+
+    if base.message_type == "request":
+        file_id = _extract_write_file_id(data)
+        length = _extract_write_length(data)
+        offset = _extract_write_offset(data)
+
+    return SMBFileOperation(
+        **base.__dict__,
+        operation="WRITE",
+        file_id=file_id,
+        offset=offset,
+        length=length,
+    )
+
+
+def _extract_write_file_id(
     data: bytes,
 ) -> str | None:
     """
-    Extract the 16-byte SMB2 READ request FileId.
+    Extract the 16-byte SMB2 WRITE request FileId.
+    """
+
+    if len(data) < 96:
+        return None
+
+    file_id = data[80:96]
+
+    if len(file_id) != 16:
+        return None
+
+    return file_id.hex()
+
+
+def _extract_write_length(
+    data: bytes,
+) -> int | None:
+    """
+    Extract the number of bytes requested by an SMB2 WRITE.
+    """
+
+    if len(data) < 72:
+        return None
+
+    return int.from_bytes(
+        data[68:72],
+        byteorder="little",
+    )
+
+
+def _extract_write_offset(
+    data: bytes,
+) -> int | None:
+    """
+    Extract the file offset requested by an SMB2 WRITE.
+    """
+
+    if len(data) < 80:
+        return None
+
+    return int.from_bytes(
+        data[72:80],
+        byteorder="little",
+    )
+
+
+def _parse_close(
+    data: bytes,
+    base: SMBObservation,
+) -> SMBFileOperation:
+    """
+    Extract the FileId from an SMB2 CLOSE request.
+
+    SMB2 CLOSE request fields begin at byte 64.
+
+    FileId: 80:96
+    """
+
+    file_id = None
+
+    if base.message_type == "request":
+        file_id = _extract_close_file_id(data)
+
+    return SMBFileOperation(
+        **base.__dict__,
+        operation="CLOSE",
+        file_id=file_id,
+    )
+
+
+def _extract_close_file_id(
+    data: bytes,
+) -> str | None:
+    """
+    Extract the 16-byte SMB2 CLOSE request FileId.
     """
 
     if len(data) < 96:
@@ -805,121 +937,3 @@ def smb_observations_from_packet(
         )
 
     return []
-
-
-def _parse_write(
-    data: bytes,
-    base: SMBObservation,
-) -> SMBFileOperation:
-    """
-    Extract the FileId, length, and offset from
-    an SMB2 WRITE request.
-
-    SMB2 WRITE request fields begin at byte 64.
-
-    Length: 68:72
-    Offset: 72:80
-    FileId: 80:96
-    """
-
-    file_id = None
-    offset = None
-    length = None
-
-    if base.message_type == "request":
-        length = _extract_write_length(data)
-        offset = _extract_write_offset(data)
-        file_id = _extract_write_file_id(data)
-
-    return SMBFileOperation(
-        **base.__dict__,
-        operation="WRITE",
-        file_id=file_id,
-        offset=offset,
-        length=length,
-    )
-
-def _extract_write_length(
-    data: bytes,
-) -> int | None:
-    if len(data) < 72:
-        return None
-
-    return int.from_bytes(
-        data[68:72],
-        byteorder="little",
-    )
-
-
-def _extract_write_offset(
-    data: bytes,
-) -> int | None:
-    if len(data) < 80:
-        return None
-
-    return int.from_bytes(
-        data[72:80],
-        byteorder="little",
-    )
-
-
-def _extract_write_file_id(
-    data: bytes,
-) -> str | None:
-    """
-    Extract the 16-byte SMB2 WRITE request FileId.
-    """
-
-    if len(data) < 96:
-        return None
-
-    file_id = data[80:96]
-
-    if len(file_id) != 16:
-        return None
-
-    return file_id.hex()
-
-
-def _parse_close(
-    data: bytes,
-    base: SMBObservation,
-) -> SMBFileOperation:
-    """
-    Extract the FileId from an SMB2 CLOSE request.
-
-    SMB2 CLOSE request fields begin at byte 64.
-
-    FileId: 80:96
-    """
-
-    file_id = None
-
-    if base.message_type == "request":
-        file_id = _extract_close_file_id(
-            data
-        )
-
-    return SMBFileOperation(
-        **base.__dict__,
-        operation="CLOSE",
-        file_id=file_id,
-    )
-
-
-def _extract_close_file_id(
-    data: bytes,
-) -> str | None:
-    """
-    Extract the 16-byte SMB2 CLOSE request FileId.
-    """
-
-    if len(data) < 96:
-        return None
-
-    file_id = data[80:96]
-
-    if len(file_id) != 16:
-        return None
-
-    return file_id.hex()

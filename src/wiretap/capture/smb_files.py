@@ -79,9 +79,6 @@ class SMBFileTracker:
         if path is None:
             return operation
 
-        return SMBFileOperation(
-            **{
-                **operation.__dict__,
-                "resolved_path": path,
-            }
-        )
+        operation.resolved_path = path
+
+        return operation

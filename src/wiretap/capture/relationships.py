@@ -3,11 +3,11 @@ from wiretap.models import (
     DNSTransaction,
     EntityRef,
     Relationship,
-    TLSCertificate,
-    TLSTransaction,
     SMBFileOperation,
     SMBSessionSetup,
     SMBTreeConnect,
+    TLSCertificate,
+    TLSTransaction,
 )
 
 
@@ -231,18 +231,33 @@ class RelationshipTracker:
         self,
         observation: SMBFileOperation,
     ) -> None:
-        if not observation.path:
+        path = (
+            observation.resolved_path
+            or observation.path
+        )
+
+        if not path:
             return
+
+        relation = {
+            "CREATE": "created_path",
+            "READ": "reads_from",
+            "WRITE": "writes_to",
+            "CLOSE": "closed_path",
+        }.get(
+            observation.operation,
+            "accessed_path",
+        )
 
         self.add(
             source=EntityRef(
                 type="host",
                 value=observation.source_ip,
             ),
-            relation="accessed_path",
+            relation=relation,
             target=EntityRef(
                 type="path",
-                value=observation.path,
+                value=path,
             ),
             timestamp=observation.timestamp,
         )

@@ -45,6 +45,8 @@ class SMBFileOperation(SMBObservation):
     offset: int | None = None
     length: int | None = None
     resolved_path: str | None = None
+    identity: str | None = None
+    share: str | None = None
 
 
 @dataclass

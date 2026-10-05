@@ -18,6 +18,10 @@ from wiretap.models import (
     TLSServerHello,
     TLSTransaction,
     TLSCertificate,
+    SMBFileOperation,
+    SMBSessionSetup,
+    SMBTreeConnect,
+    SMBTransaction,
 )
 from wiretap.output.jsonl import (
     connection_to_dict,
@@ -48,6 +52,15 @@ from wiretap.output.jsonl import (
     tls_transaction_to_dict,
     serialize_tls_certificate,
     tls_certificate_to_dict,
+    serialize_smb_file_operation,
+    serialize_smb_session_setup,
+    serialize_smb_tree_connect,
+    smb_file_operation_to_dict,
+    smb_session_setup_to_dict,
+    smb_tree_connect_to_dict,
+    smb_observation_to_dict,
+    smb_transaction_to_dict,
+    serialize_smb_transaction,
 )
 from wiretap.capture.flow import Flow
 
@@ -822,4 +835,383 @@ def test_tls_certificate_serializes_as_json():
 
     assert parsed["fingerprint_sha256"] == (
         "abc123"
+    )
+
+def test_smb_session_setup_to_dict():
+    observation = SMBSessionSetup(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="SESSION_SETUP",
+        message_type="request",
+        message_id=1,
+        session_id=123,
+        tree_id=0,
+        username="alice",
+        domain="CORP",
+        workstation="WS01",
+    )
+
+    result = smb_session_setup_to_dict(
+        observation
+    )
+
+    assert result["type"] == (
+        "smb_session_setup"
+    )
+
+    assert result["source_ip"] == (
+        "10.10.10.42"
+    )
+
+    assert result["session_id"] == 123
+
+    assert result["username"] == "alice"
+    assert result["domain"] == "CORP"
+    assert result["workstation"] == "WS01"
+
+    assert result["identity"] == (
+        r"CORP\alice"
+    )
+
+
+def test_smb_session_setup_serializes_as_json():
+    observation = SMBSessionSetup(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="SESSION_SETUP",
+        message_type="request",
+        message_id=1,
+        session_id=123,
+        username="alice",
+        domain="CORP",
+        workstation="WS01",
+    )
+
+    result = serialize_smb_session_setup(
+        observation
+    )
+
+    parsed = json.loads(result)
+
+    assert parsed["type"] == (
+        "smb_session_setup"
+    )
+
+    assert parsed["identity"] == (
+        r"CORP\alice"
+    )
+
+
+def test_smb_tree_connect_to_dict():
+    observation = SMBTreeConnect(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="TREE_CONNECT",
+        message_type="request",
+        message_id=2,
+        session_id=123,
+        tree_id=456,
+        share=r"\\10.10.10.30\ADMIN$",
+        share_type=None,
+    )
+
+    result = smb_tree_connect_to_dict(
+        observation
+    )
+
+    assert result["type"] == (
+        "smb_tree_connect"
+    )
+
+    assert result["session_id"] == 123
+    assert result["tree_id"] == 456
+
+    assert result["share"] == (
+        r"\\10.10.10.30\ADMIN$"
+    )
+
+
+def test_smb_tree_connect_serializes_as_json():
+    observation = SMBTreeConnect(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="TREE_CONNECT",
+        message_type="request",
+        message_id=2,
+        session_id=123,
+        tree_id=456,
+        share=r"\\10.10.10.30\ADMIN$",
+        share_type=None,
+    )
+
+    result = serialize_smb_tree_connect(
+        observation
+    )
+
+    parsed = json.loads(result)
+
+    assert parsed["type"] == (
+        "smb_tree_connect"
+    )
+
+    assert parsed["share"] == (
+        r"\\10.10.10.30\ADMIN$"
+    )
+
+
+def test_smb_file_operation_to_dict():
+    operation = SMBFileOperation(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="WRITE",
+        message_type="request",
+        message_id=11,
+        session_id=123,
+        tree_id=456,
+        operation="WRITE",
+        path=None,
+        filename=None,
+        file_id=(
+            "00112233445566778899aabbccddeeff"
+        ),
+        resolved_path=r"\Temp\payload.exe",
+        offset=16384,
+        length=2048,
+        identity=r"CORP\alice",
+        share=r"\\10.10.10.30\ADMIN$",
+    )
+
+    result = smb_file_operation_to_dict(
+        operation
+    )
+
+    assert result["type"] == (
+        "smb_file_operation"
+    )
+
+    assert result["operation"] == "WRITE"
+
+    assert result["source_ip"] == (
+        "10.10.10.42"
+    )
+
+    assert result["session_id"] == 123
+    assert result["tree_id"] == 456
+
+    assert result["file_id"] == (
+        "00112233445566778899aabbccddeeff"
+    )
+
+    assert result["resolved_path"] == (
+        r"\Temp\payload.exe"
+    )
+
+    assert result["offset"] == 16384
+    assert result["length"] == 2048
+
+    assert result["identity"] == (
+        r"CORP\alice"
+    )
+
+    assert result["share"] == (
+        r"\\10.10.10.30\ADMIN$"
+    )
+
+
+def test_smb_file_operation_serializes_as_json():
+    operation = SMBFileOperation(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="READ",
+        message_type="request",
+        message_id=12,
+        session_id=123,
+        tree_id=456,
+        operation="READ",
+        file_id=(
+            "00112233445566778899aabbccddeeff"
+        ),
+        resolved_path=r"\Temp\payload.exe",
+        offset=8192,
+        length=4096,
+        identity=r"CORP\alice",
+        share=r"\\10.10.10.30\ADMIN$",
+    )
+
+    result = serialize_smb_file_operation(
+        operation
+    )
+
+    parsed = json.loads(result)
+
+    assert parsed["type"] == (
+        "smb_file_operation"
+    )
+
+    assert parsed["operation"] == "READ"
+
+    assert parsed["resolved_path"] == (
+        r"\Temp\payload.exe"
+    )
+
+    assert parsed["offset"] == 8192
+    assert parsed["length"] == 4096
+
+    assert parsed["identity"] == (
+        r"CORP\alice"
+    )
+
+    assert parsed["share"] == (
+        r"\\10.10.10.30\ADMIN$"
+    )
+
+
+def test_smb_transaction_to_dict():
+    request = SMBTreeConnect(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="TREE_CONNECT",
+        message_type="request",
+        message_id=2,
+        session_id=123,
+        tree_id=456,
+        share=r"\\10.10.10.30\ADMIN$",
+        share_type=None,
+    )
+
+    response = SMBTreeConnect(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.30",
+        source_port=445,
+        destination_ip="10.10.10.42",
+        destination_port=49152,
+        version="SMB3",
+        command="TREE_CONNECT",
+        message_type="response",
+        message_id=2,
+        session_id=123,
+        tree_id=456,
+        share=r"\\10.10.10.30\ADMIN$",
+        share_type="DISK",
+    )
+
+    transaction = SMBTransaction(
+        request=request,
+        response=response,
+    )
+
+    result = smb_transaction_to_dict(
+        transaction
+    )
+
+    assert result["type"] == (
+        "smb_transaction"
+    )
+
+    assert result["request"] is not None
+    assert result["response"] is not None
+
+    assert result["request"]["type"] == (
+        "smb_tree_connect"
+    )
+
+    assert result["response"]["type"] == (
+        "smb_tree_connect"
+    )
+
+    assert result["request"]["message_type"] == (
+        "request"
+    )
+
+    assert result["response"]["message_type"] == (
+        "response"
+    )
+
+    assert result["request"]["share"] == (
+        r"\\10.10.10.30\ADMIN$"
+    )
+
+    assert result["response"]["share_type"] == (
+        "DISK"
+    )
+
+
+def test_smb_transaction_serializes_as_json():
+    request = SMBFileOperation(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="WRITE",
+        message_type="request",
+        message_id=11,
+        session_id=123,
+        tree_id=456,
+        operation="WRITE",
+        file_id=(
+            "00112233445566778899aabbccddeeff"
+        ),
+        resolved_path=r"\Temp\payload.exe",
+        offset=16384,
+        length=2048,
+        identity=r"CORP\alice",
+        share=r"\\10.10.10.30\ADMIN$",
+    )
+
+    transaction = SMBTransaction(
+        request=request,
+    )
+
+    result = serialize_smb_transaction(
+        transaction
+    )
+
+    parsed = json.loads(result)
+
+    assert parsed["type"] == (
+        "smb_transaction"
+    )
+
+    assert parsed["response"] is None
+
+    assert parsed["request"]["operation"] == (
+        "WRITE"
+    )
+
+    assert parsed["request"]["resolved_path"] == (
+        r"\Temp\payload.exe"
+    )
+
+    assert parsed["request"]["identity"] == (
+        r"CORP\alice"
     )

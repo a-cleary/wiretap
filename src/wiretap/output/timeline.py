@@ -11,6 +11,10 @@ from wiretap.models import (
     HTTPResponse,
     HTTPTransaction,
     Relationship,
+    SMBFileOperation,
+    SMBSessionSetup,
+    SMBTreeConnect,
+    SMBTransaction,
     Service,
     TLSClientHello,
     TLSServerHello,
@@ -28,6 +32,10 @@ from wiretap.output.jsonl import (
     http_transaction_to_dict,
     relationship_to_dict,
     service_to_dict,
+    smb_file_operation_to_dict,
+    smb_session_setup_to_dict,
+    smb_tree_connect_to_dict,
+    smb_transaction_to_dict,
     tls_client_hello_to_dict,
     tls_server_hello_to_dict,
     tls_transaction_to_dict,
@@ -151,6 +159,42 @@ def relationship_to_timeline(
     )
 
 
+def smb_session_setup_to_timeline(
+    observation: SMBSessionSetup,
+) -> TimelineRecord:
+    return TimelineRecord(
+        timestamp=observation.timestamp,
+        record_type="smb_session_setup",
+        data=smb_session_setup_to_dict(
+            observation
+        ),
+    )
+
+
+def smb_tree_connect_to_timeline(
+    observation: SMBTreeConnect,
+) -> TimelineRecord:
+    return TimelineRecord(
+        timestamp=observation.timestamp,
+        record_type="smb_tree_connect",
+        data=smb_tree_connect_to_dict(
+            observation
+        ),
+    )
+
+
+def smb_file_operation_to_timeline(
+    observation: SMBFileOperation,
+) -> TimelineRecord:
+    return TimelineRecord(
+        timestamp=observation.timestamp,
+        record_type="smb_file_operation",
+        data=smb_file_operation_to_dict(
+            observation
+        ),
+    )
+
+
 def observation_to_timeline(
     observation,
 ) -> TimelineRecord:
@@ -163,12 +207,18 @@ def observation_to_timeline(
     if isinstance(observation, HTTPResponse):
         return http_response_to_timeline(observation)
 
-    if isinstance(observation, TLSClientHello):
+    if isinstance(
+        observation,
+        TLSClientHello,
+    ):
         return tls_client_hello_to_timeline(
             observation
         )
 
-    if isinstance(observation, TLSServerHello):
+    if isinstance(
+        observation,
+        TLSServerHello,
+    ):
         return tls_server_hello_to_timeline(
             observation
         )
@@ -178,6 +228,30 @@ def observation_to_timeline(
         TLSCertificate,
     ):
         return tls_certificate_to_timeline(
+            observation
+        )
+
+    if isinstance(
+        observation,
+        SMBSessionSetup,
+    ):
+        return smb_session_setup_to_timeline(
+            observation
+        )
+
+    if isinstance(
+        observation,
+        SMBTreeConnect,
+    ):
+        return smb_tree_connect_to_timeline(
+            observation
+        )
+
+    if isinstance(
+        observation,
+        SMBFileOperation,
+    ):
+        return smb_file_operation_to_timeline(
             observation
         )
 
@@ -243,5 +317,26 @@ def tls_certificate_to_timeline(
         record_type="tls_certificate",
         data=tls_certificate_to_dict(
             certificate
+        ),
+    )
+
+
+def smb_transaction_to_timeline(
+    transaction: SMBTransaction,
+) -> TimelineRecord:
+    if transaction.request is not None:
+        timestamp = transaction.request.timestamp
+    elif transaction.response is not None:
+        timestamp = transaction.response.timestamp
+    else:
+        raise ValueError(
+            "SMB transaction contains no request or response"
+        )
+
+    return TimelineRecord(
+        timestamp=timestamp,
+        record_type="smb_transaction",
+        data=smb_transaction_to_dict(
+            transaction
         ),
     )

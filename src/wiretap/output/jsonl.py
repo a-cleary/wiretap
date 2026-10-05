@@ -12,6 +12,10 @@ from wiretap.models import (
     HTTPResponse,
     HTTPTransaction,
     Relationship,
+    SMBFileOperation,
+    SMBSessionSetup,
+    SMBTransaction,
+    SMBTreeConnect,
     Service,
     TLSClientHello,
     TLSServerHello,
@@ -502,6 +506,205 @@ def serialize_tls_certificate(
     return json.dumps(
         tls_certificate_to_dict(
             certificate
+        ),
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def smb_session_setup_to_dict(
+    observation: SMBSessionSetup,
+) -> dict[str, Any]:
+    identity = observation.username
+
+    if identity and observation.domain:
+        identity = (
+            f"{observation.domain}\\"
+            f"{identity}"
+        )
+
+    return {
+        "type": "smb_session_setup",
+        "timestamp": _timestamp(
+            observation.timestamp
+        ),
+        "source_ip": observation.source_ip,
+        "source_port": observation.source_port,
+        "destination_ip": observation.destination_ip,
+        "destination_port": observation.destination_port,
+        "version": observation.version,
+        "command": observation.command,
+        "message_type": observation.message_type,
+        "message_id": observation.message_id,
+        "session_id": observation.session_id,
+        "tree_id": observation.tree_id,
+        "username": observation.username,
+        "domain": observation.domain,
+        "workstation": observation.workstation,
+        "identity": identity,
+    }
+
+
+def serialize_smb_session_setup(
+    observation: SMBSessionSetup,
+) -> str:
+    return json.dumps(
+        smb_session_setup_to_dict(
+            observation
+        ),
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def smb_tree_connect_to_dict(
+    observation: SMBTreeConnect,
+) -> dict[str, Any]:
+    return {
+        "type": "smb_tree_connect",
+        "timestamp": _timestamp(
+            observation.timestamp
+        ),
+        "source_ip": observation.source_ip,
+        "source_port": observation.source_port,
+        "destination_ip": observation.destination_ip,
+        "destination_port": observation.destination_port,
+        "version": observation.version,
+        "command": observation.command,
+        "message_type": observation.message_type,
+        "message_id": observation.message_id,
+        "session_id": observation.session_id,
+        "tree_id": observation.tree_id,
+        "share": observation.share,
+        "share_type": observation.share_type,
+    }
+
+
+def serialize_smb_tree_connect(
+    observation: SMBTreeConnect,
+) -> str:
+    return json.dumps(
+        smb_tree_connect_to_dict(
+            observation
+        ),
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def smb_file_operation_to_dict(
+    operation: SMBFileOperation,
+) -> dict[str, Any]:
+    return {
+        "type": "smb_file_operation",
+        "timestamp": _timestamp(
+            operation.timestamp
+        ),
+        "source_ip": operation.source_ip,
+        "source_port": operation.source_port,
+        "destination_ip": operation.destination_ip,
+        "destination_port": operation.destination_port,
+        "version": operation.version,
+        "command": operation.command,
+        "message_type": operation.message_type,
+        "message_id": operation.message_id,
+        "session_id": operation.session_id,
+        "tree_id": operation.tree_id,
+        "operation": operation.operation,
+        "path": operation.path,
+        "filename": operation.filename,
+        "file_id": operation.file_id,
+        "resolved_path": operation.resolved_path,
+        "offset": operation.offset,
+        "length": operation.length,
+        "identity": operation.identity,
+        "share": operation.share,
+    }
+
+
+def serialize_smb_file_operation(
+    operation: SMBFileOperation,
+) -> str:
+    return json.dumps(
+        smb_file_operation_to_dict(
+            operation
+        ),
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def smb_observation_to_dict(
+    observation,
+) -> dict[str, Any]:
+    if isinstance(
+        observation,
+        SMBSessionSetup,
+    ):
+        return smb_session_setup_to_dict(
+            observation
+        )
+
+    if isinstance(
+        observation,
+        SMBTreeConnect,
+    ):
+        return smb_tree_connect_to_dict(
+            observation
+        )
+
+    if isinstance(
+        observation,
+        SMBFileOperation,
+    ):
+        return smb_file_operation_to_dict(
+            observation
+        )
+
+    raise TypeError(
+        "Unsupported SMB observation type: "
+        f"{type(observation).__name__}"
+    )
+
+
+def smb_transaction_to_dict(
+    transaction: SMBTransaction,
+) -> dict[str, Any]:
+    if transaction.request is not None:
+        timestamp = transaction.request.timestamp
+    elif transaction.response is not None:
+        timestamp = transaction.response.timestamp
+    else:
+        raise ValueError(
+            "SMB transaction contains no request or response"
+        )
+
+    return {
+        "type": "smb_transaction",
+        "timestamp": _timestamp(timestamp),
+        "request": (
+            smb_observation_to_dict(
+                transaction.request
+            )
+            if transaction.request is not None
+            else None
+        ),
+        "response": (
+            smb_observation_to_dict(
+                transaction.response
+            )
+            if transaction.response is not None
+            else None
+        ),
+    }
+
+
+def serialize_smb_transaction(
+    transaction: SMBTransaction,
+) -> str:
+    return json.dumps(
+        smb_transaction_to_dict(
+            transaction
         ),
         separators=(",", ":"),
         sort_keys=True,

@@ -33,6 +33,9 @@ from wiretap.models import (
 from wiretap.capture.smb_files import (
     SMBFileTracker,
 )
+from wiretap.capture.smb_context import (
+    SMBContextTracker,
+)
 
 
 class CaptureProcessor:
@@ -46,6 +49,7 @@ class CaptureProcessor:
         self.tls_tracker = TLSTransactionTracker()
         self.smb_tracker = SMBTransactionTracker()
         self.smb_file_tracker = SMBFileTracker()
+        self.smb_context_tracker = SMBContextTracker()
 
         self.observations = []
 
@@ -98,6 +102,9 @@ class CaptureProcessor:
                     observation,
                     SMBSessionSetup,
                 ):
+                    self.smb_context_tracker.add_session_setup(
+                        observation
+                    )
                     self.entity_tracker.add_smb_session_setup(
                         observation
                     )
@@ -109,6 +116,9 @@ class CaptureProcessor:
                     observation,
                     SMBTreeConnect,
                 ):
+                    self.smb_context_tracker.add_tree_connect(
+                        observation
+                    )
                     self.entity_tracker.add_smb_tree_connect(
                         observation
                     )
@@ -173,19 +183,13 @@ class CaptureProcessor:
                 transaction
             )
 
-        for transaction in self.smb_tracker.transactions():
-            self.smb_file_tracker.add_transaction(
-                transaction
-            )
-
-        for observation in self.observations:
+        for index, observation in enumerate(
+            self.observations
+        ):
             if not isinstance(
                 observation,
                 SMBFileOperation,
             ):
-                continue
-
-            if observation.operation == "CREATE":
                 continue
 
             resolved = (
@@ -194,9 +198,14 @@ class CaptureProcessor:
                 )
             )
 
-            if resolved.resolved_path is None:
-                continue
+            resolved = (
+                self.smb_context_tracker.resolve_operation(
+                    resolved
+                )
+            )
 
-            observation.resolved_path = (
-                resolved.resolved_path
+            self.observations[index] = resolved
+
+            self.relationship_tracker.add_smb_file_operation(
+                resolved
             )
