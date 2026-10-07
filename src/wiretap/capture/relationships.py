@@ -2,7 +2,7 @@ from wiretap.capture.flow import Flow
 from wiretap.models import (
     DNSTransaction,
     EntityRef,
-    Relationship,
+    KnowledgeModel,
     SMBFileOperation,
     SMBSessionSetup,
     SMBTreeConnect,
@@ -12,11 +12,23 @@ from wiretap.models import (
 
 
 class RelationshipTracker:
-    def __init__(self) -> None:
-        self._relationships: dict[
-            tuple[EntityRef, str, EntityRef],
-            Relationship,
-        ] = {}
+    """
+    Compatibility layer around the knowledge model.
+
+    Protocol-specific code can continue calling the existing
+    RelationshipTracker API while relationships are stored in
+    the central KnowledgeModel.
+    """
+
+    def __init__(
+        self,
+        knowledge: KnowledgeModel | None = None,
+    ) -> None:
+        self.knowledge = (
+            knowledge
+            if knowledge is not None
+            else KnowledgeModel()
+        )
 
     def add(
         self,
@@ -25,39 +37,17 @@ class RelationshipTracker:
         target: EntityRef,
         timestamp,
     ) -> None:
-        key = (
-            source,
-            relation,
-            target,
+        self.knowledge.add_relationship(
+            source=source,
+            relation=relation,
+            target=target,
+            timestamp=timestamp,
         )
 
-        relationship = self._relationships.get(key)
-
-        if relationship is None:
-            self._relationships[key] = Relationship(
-                source=source,
-                relation=relation,
-                target=target,
-                first_seen=timestamp,
-                last_seen=timestamp,
-            )
-            return
-
-        self._relationships[key] = Relationship(
-            source=relationship.source,
-            relation=relationship.relation,
-            target=relationship.target,
-            first_seen=min(
-                relationship.first_seen,
-                timestamp,
-            ),
-            last_seen=max(
-                relationship.last_seen,
-                timestamp,
-            ),
-        )
-
-    def add_flow(self, flow: Flow) -> None:
+    def add_flow(
+        self,
+        flow: Flow,
+    ) -> None:
         if flow.initiator is None:
             return
 
@@ -262,7 +252,5 @@ class RelationshipTracker:
             timestamp=observation.timestamp,
         )
 
-    def relationships(self) -> list[Relationship]:
-        return list(
-            self._relationships.values()
-        )
+    def relationships(self):
+        return self.knowledge.relationships()

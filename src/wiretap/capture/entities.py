@@ -3,6 +3,7 @@ from wiretap.models import (
     EntityRef,
     Host,
     Hostname,
+    KnowledgeModel,
     Service,
     TLSCertificate,
     TLSTransaction,
@@ -13,36 +14,38 @@ from wiretap.models import (
 
 
 class EntityTracker:
-    def __init__(self) -> None:
-        self._hosts: dict[str, Host] = {}
+    """
+    Compatibility layer around the central KnowledgeModel.
 
-        self._hostnames: dict[str, Hostname] = {}
+    The KnowledgeModel is the source of truth for entities and rich
+    entity records. This class preserves the existing EntityTracker
+    API while delegating storage to the knowledge model.
+    """
 
-        self._services: dict[
-            tuple[str, int, str],
-            Service,
-        ] = {}
-
-        self._certificates: dict[
-            str,
-            TLSCertificate,
-        ] = {}
-
-        # Entity types that do not yet have dedicated
-        # domain models.
-        self._entities: set[EntityRef] = set()
-
-    def add_flow(self, flow: Flow) -> None:
-        self._add_host(
-            flow.endpoint_a.ip,
-            flow.first_seen,
-            flow.last_seen,
+    def __init__(
+        self,
+        knowledge: KnowledgeModel | None = None,
+    ) -> None:
+        self.knowledge = (
+            knowledge
+            if knowledge is not None
+            else KnowledgeModel()
         )
 
-        self._add_host(
-            flow.endpoint_b.ip,
-            flow.first_seen,
-            flow.last_seen,
+    def add_flow(
+        self,
+        flow: Flow,
+    ) -> None:
+        self.knowledge.add_host(
+            ip=flow.endpoint_a.ip,
+            first_seen=flow.first_seen,
+            last_seen=flow.last_seen,
+        )
+
+        self.knowledge.add_host(
+            ip=flow.endpoint_b.ip,
+            first_seen=flow.first_seen,
+            last_seen=flow.last_seen,
         )
 
         if flow.responder is None:
@@ -51,7 +54,7 @@ class EntityTracker:
         if flow.responder.port is None:
             return
 
-        self._add_service(
+        self.knowledge.add_service(
             host_ip=flow.responder.ip,
             port=flow.responder.port,
             protocol=flow.protocol,
@@ -65,17 +68,17 @@ class EntityTracker:
     ) -> None:
         query = transaction.query
 
-        self._add_hostname(
-            query.query,
-            query.timestamp,
-            transaction.timestamp,
+        self.knowledge.add_hostname(
+            name=query.query,
+            first_seen=query.timestamp,
+            last_seen=transaction.timestamp,
         )
 
         for answer in transaction.answers:
-            self._add_hostname(
-                answer.name,
-                query.timestamp,
-                transaction.timestamp,
+            self.knowledge.add_hostname(
+                name=answer.name,
+                first_seen=query.timestamp,
+                last_seen=transaction.timestamp,
             )
 
             if answer.record_type not in {
@@ -84,10 +87,10 @@ class EntityTracker:
             }:
                 continue
 
-            self._add_host(
-                answer.value,
-                query.timestamp,
-                transaction.timestamp,
+            self.knowledge.add_host(
+                ip=answer.value,
+                first_seen=query.timestamp,
+                last_seen=transaction.timestamp,
             )
 
     def add_tls_transaction(
@@ -102,30 +105,23 @@ class EntityTracker:
         if hello.server_name is None:
             return
 
-        self._add_hostname(
-            hello.server_name,
-            hello.timestamp,
-            hello.timestamp,
+        self.knowledge.add_hostname(
+            name=hello.server_name,
+            first_seen=hello.timestamp,
+            last_seen=hello.timestamp,
         )
 
     def add_tls_certificate(
         self,
         certificate: TLSCertificate,
     ) -> None:
-        existing = self._certificates.get(
-            certificate.fingerprint_sha256
+        self.knowledge.add_certificate(
+            fingerprint_sha256=(
+                certificate.fingerprint_sha256
+            ),
+            timestamp=certificate.timestamp,
+            certificate=certificate,
         )
-
-        if existing is None:
-            self._certificates[
-                certificate.fingerprint_sha256
-            ] = certificate
-            return
-
-        if existing.timestamp > certificate.timestamp:
-            self._certificates[
-                certificate.fingerprint_sha256
-            ] = certificate
 
     def add_smb_session_setup(
         self,
@@ -134,19 +130,9 @@ class EntityTracker:
         if not observation.username:
             return
 
-        identity = observation.username
-
-        if observation.domain:
-            identity = (
-                f"{observation.domain}\\"
-                f"{identity}"
-            )
-
-        self._entities.add(
-            EntityRef(
-                type="identity",
-                value=identity,
-            )
+        self.knowledge.add_identity(
+            username=observation.username,
+            domain=observation.domain,
         )
 
     def add_smb_tree_connect(
@@ -156,11 +142,8 @@ class EntityTracker:
         if not observation.share:
             return
 
-        self._entities.add(
-            EntityRef(
-                type="share",
-                value=observation.share,
-            )
+        self.knowledge.add_share(
+            share=observation.share
         )
 
     def add_smb_file_operation(
@@ -170,11 +153,8 @@ class EntityTracker:
         if not observation.path:
             return
 
-        self._entities.add(
-            EntityRef(
-                type="path",
-                value=observation.path,
-            )
+        self.knowledge.add_path(
+            path=observation.path
         )
 
     def service_ref(
@@ -221,126 +201,46 @@ class EntityTracker:
 
         refs.extend(
             self.host_ref(host)
-            for host in self._hosts.values()
+            for host in self.knowledge.hosts()
         )
 
         refs.extend(
             self.hostname_ref(hostname)
-            for hostname in self._hostnames.values()
+            for hostname in self.knowledge.hostnames()
         )
 
         refs.extend(
             self.service_ref(service)
-            for service in self._services.values()
+            for service in self.knowledge.services()
         )
 
         refs.extend(
             self.certificate_ref(certificate)
-            for certificate in self._certificates.values()
+            for certificate
+            in self.knowledge.certificates()
         )
 
-        refs.extend(self._entities)
+        rich_entity_ids = {
+            entity.id
+            for entity in refs
+        }
+
+        refs.extend(
+            entity
+            for entity in self.knowledge.entities()
+            if entity.id not in rich_entity_ids
+        )
 
         return refs
 
-    def _add_host(
-        self,
-        ip: str,
-        first_seen,
-        last_seen,
-    ) -> None:
-        host = self._hosts.get(ip)
-
-        if host is None:
-            self._hosts[ip] = Host(
-                ip=ip,
-                first_seen=first_seen,
-                last_seen=last_seen,
-            )
-            return
-
-        host.first_seen = min(
-            host.first_seen,
-            first_seen,
-        )
-
-        host.last_seen = max(
-            host.last_seen,
-            last_seen,
-        )
-
-    def _add_hostname(
-        self,
-        name: str,
-        first_seen,
-        last_seen,
-    ) -> None:
-        hostname = self._hostnames.get(name)
-
-        if hostname is None:
-            self._hostnames[name] = Hostname(
-                name=name,
-                first_seen=first_seen,
-                last_seen=last_seen,
-            )
-            return
-
-        hostname.first_seen = min(
-            hostname.first_seen,
-            first_seen,
-        )
-
-        hostname.last_seen = max(
-            hostname.last_seen,
-            last_seen,
-        )
-
-    def _add_service(
-        self,
-        host_ip: str,
-        port: int,
-        protocol: str,
-        first_seen,
-        last_seen,
-    ) -> None:
-        key = (
-            host_ip,
-            port,
-            protocol,
-        )
-
-        service = self._services.get(key)
-
-        if service is None:
-            self._services[key] = Service(
-                host_ip=host_ip,
-                port=port,
-                protocol=protocol,
-                first_seen=first_seen,
-                last_seen=last_seen,
-            )
-            return
-
-        service.first_seen = min(
-            service.first_seen,
-            first_seen,
-        )
-
-        service.last_seen = max(
-            service.last_seen,
-            last_seen,
-        )
-
     def hosts(self) -> list[Host]:
-        return list(self._hosts.values())
+        return self.knowledge.hosts()
 
     def hostnames(self) -> list[Hostname]:
-        return list(self._hostnames.values())
+        return self.knowledge.hostnames()
 
     def services(self) -> list[Service]:
-        return list(self._services.values())
+        return self.knowledge.services()
 
     def certificates(self) -> list[TLSCertificate]:
-        return list(
-            self._certificates.values()
-        )
+        return self.knowledge.certificates()

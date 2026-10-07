@@ -202,3 +202,250 @@ def test_cli_outputs_jsonl(test_pcap, monkeypatch, capsys):
         "target_type" in relationship
         for relationship in relationships
     )
+
+
+def test_cli_host_query(test_pcap, monkeypatch, capsys):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "wiretap",
+            str(test_pcap),
+            "--host",
+            "10.10.10.20",
+        ],
+    )
+
+    main()
+
+    output = capsys.readouterr().out
+    result = json.loads(output)
+
+    assert result["host"]["ip"] == "10.10.10.20"
+
+    assert {
+        service["port"]
+        for service in result["services"]
+    } == {80}
+
+
+def test_cli_host_query_unknown_host(
+    test_pcap,
+    monkeypatch,
+    capsys,
+):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "wiretap",
+            str(test_pcap),
+            "--host",
+            "10.10.10.99",
+        ],
+    )
+
+    try:
+        main()
+    except SystemExit as exc:
+        assert exc.code == "Host not found: 10.10.10.99"
+    else:
+        raise AssertionError(
+            "Expected SystemExit"
+        )
+
+    assert capsys.readouterr().out == ""
+
+
+def test_cli_related_query(
+    test_pcap,
+    monkeypatch,
+    capsys,
+):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "wiretap",
+            str(test_pcap),
+            "--related",
+            "10.10.10.42",
+        ],
+    )
+
+    main()
+
+    output = capsys.readouterr().out
+    result = json.loads(output)
+
+    assert {
+        entity["id"]
+        for entity in result
+    } == {
+        "host:10.10.10.20",
+        "host:10.10.10.30",
+        "host:10.10.10.10",
+        "hostname:fileserver.corp.local",
+    }
+
+
+def test_cli_related_query_with_relation(
+    test_pcap,
+    monkeypatch,
+    capsys,
+):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "wiretap",
+            str(test_pcap),
+            "--related",
+            "10.10.10.42",
+            "--relation",
+            "queried",
+        ],
+    )
+
+    main()
+
+    output = capsys.readouterr().out
+    result = json.loads(output)
+
+    assert result == [
+        {
+            "id": "hostname:fileserver.corp.local",
+            "type": "hostname",
+            "value": "fileserver.corp.local",
+        }
+    ]
+
+
+def test_cli_traverse_query(
+    test_pcap,
+    monkeypatch,
+    capsys,
+):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "wiretap",
+            str(test_pcap),
+            "--traverse",
+            "10.10.10.42",
+            "--depth",
+            "2",
+        ],
+    )
+
+    main()
+
+    output = capsys.readouterr().out
+    result = json.loads(output)
+
+    assert {
+        entity["id"]
+        for entity in result["entities"]
+    } == {
+        "host:10.10.10.42",
+        "host:10.10.10.20",
+        "host:10.10.10.30",
+        "host:10.10.10.10",
+        "hostname:fileserver.corp.local",
+        "service:tcp/80",
+        "service:tcp/445",
+        "service:tcp/88",
+        "service:udp/53",
+    }
+
+
+def test_cli_traverse_query_jsonl(
+    test_pcap,
+    monkeypatch,
+    capsys,
+):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "wiretap",
+            str(test_pcap),
+            "--traverse",
+            "10.10.10.42",
+            "--depth",
+            "1",
+            "--jsonl",
+        ],
+    )
+
+    main()
+
+    output = capsys.readouterr().out
+    lines = output.strip().splitlines()
+
+    records = [
+        json.loads(line)
+        for line in lines
+    ]
+
+    assert all(
+        record["type"]
+        in {"entity", "relationship"}
+        for record in records
+    )
+
+    assert any(
+        record["id"] == "host:10.10.10.20"
+        for record in records
+    )
+
+    assert any(
+        record["id"] == "host:10.10.10.42:connects_to:host:10.10.10.20"
+        for record in records
+        if record["type"] == "relationship"
+    )
+
+
+def test_cli_rejects_relation_without_query(
+    test_pcap,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "wiretap",
+            str(test_pcap),
+            "--relation",
+            "runs",
+        ],
+    )
+
+    try:
+        main()
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError(
+            "Expected SystemExit"
+        )
+
+
+def test_cli_rejects_negative_depth(
+    test_pcap,
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "wiretap",
+            str(test_pcap),
+            "--traverse",
+            "10.10.10.42",
+            "--depth",
+            "-1",
+        ],
+    )
+
+    try:
+        main()
+    except SystemExit as exc:
+        assert exc.code == 2
+    else:
+        raise AssertionError(
+            "Expected SystemExit"
+        )

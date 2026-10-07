@@ -22,6 +22,7 @@ from wiretap.models import (
     DNSQuery,
     HTTPRequest,
     HTTPResponse,
+    KnowledgeModel,
     SMBFileOperation,
     SMBObservation,
     SMBSessionSetup,
@@ -41,8 +42,16 @@ from wiretap.capture.smb_context import (
 class CaptureProcessor:
     def __init__(self) -> None:
         self.flow_tracker = FlowTracker()
-        self.entity_tracker = EntityTracker()
-        self.relationship_tracker = RelationshipTracker()
+
+        self.knowledge = KnowledgeModel()
+
+        self.entity_tracker = EntityTracker(
+            knowledge=self.knowledge
+        )
+
+        self.relationship_tracker = RelationshipTracker(
+            knowledge=self.knowledge
+        )
 
         self.http_tracker = HTTPTransactionTracker()
         self.dns_tracker = DNSTransactionTracker()
