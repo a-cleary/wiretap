@@ -15,6 +15,7 @@ from wiretap.models import (
     SMBSessionSetup,
     SMBTreeConnect,
     SMBTransaction,
+    SMBNegotiate,
     Service,
     TLSClientHello,
     TLSServerHello,
@@ -36,6 +37,7 @@ from wiretap.output.jsonl import (
     smb_session_setup_to_dict,
     smb_tree_connect_to_dict,
     smb_transaction_to_dict,
+    smb_negotiate_to_dict,
     tls_client_hello_to_dict,
     tls_server_hello_to_dict,
     tls_transaction_to_dict,
@@ -233,6 +235,14 @@ def observation_to_timeline(
 
     if isinstance(
         observation,
+        SMBNegotiate,
+    ):
+        return smb_negotiate_to_timeline(
+            observation
+        )
+
+    if isinstance(
+        observation,
         SMBSessionSetup,
     ):
         return smb_session_setup_to_timeline(
@@ -338,5 +348,17 @@ def smb_transaction_to_timeline(
         record_type="smb_transaction",
         data=smb_transaction_to_dict(
             transaction
+        ),
+    )
+
+
+def smb_negotiate_to_timeline(
+    observation: SMBNegotiate,
+) -> TimelineRecord:
+    return TimelineRecord(
+        timestamp=observation.timestamp,
+        record_type="smb_negotiate",
+        data=smb_negotiate_to_dict(
+            observation
         ),
     )

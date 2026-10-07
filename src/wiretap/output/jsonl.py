@@ -16,6 +16,7 @@ from wiretap.models import (
     SMBSessionSetup,
     SMBTransaction,
     SMBTreeConnect,
+    SMBNegotiate,
     Service,
     TLSClientHello,
     TLSServerHello,
@@ -705,6 +706,39 @@ def serialize_smb_transaction(
     return json.dumps(
         smb_transaction_to_dict(
             transaction
+        ),
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def smb_negotiate_to_dict(
+    observation: SMBNegotiate,
+) -> dict[str, Any]:
+    return {
+        "type": "smb_negotiate",
+        "timestamp": _timestamp(observation.timestamp),
+        "source_ip": observation.source_ip,
+        "source_port": observation.source_port,
+        "destination_ip": observation.destination_ip,
+        "destination_port": observation.destination_port,
+        "version": observation.version,
+        "command": observation.command,
+        "message_type": observation.message_type,
+        "message_id": observation.message_id,
+        "session_id": observation.session_id,
+        "tree_id": observation.tree_id,
+        "dialect": observation.dialect,
+        "dialects": observation.dialects,
+    }
+
+
+def serialize_smb_negotiate(
+    observation: SMBNegotiate,
+) -> str:
+    return json.dumps(
+        smb_negotiate_to_dict(
+            observation
         ),
         separators=(",", ":"),
         sort_keys=True,

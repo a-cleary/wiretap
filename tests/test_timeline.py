@@ -24,6 +24,7 @@ from wiretap.models import (
     SMBSessionSetup,
     SMBTreeConnect,
     SMBTransaction,
+    SMBNegotiate,
 )
 from wiretap.output.timeline import (
     TimelineRecord,
@@ -47,6 +48,7 @@ from wiretap.output.timeline import (
     smb_session_setup_to_timeline,
     smb_tree_connect_to_timeline,
     smb_transaction_to_timeline,
+    smb_negotiate_to_timeline,
 )
 
 
@@ -843,3 +845,58 @@ def test_smb_transaction_to_timeline():
     assert result.data["response"]["message_type"] == (
         "response"
     )
+
+
+def test_smb_negotiate_to_timeline():
+    observation = SMBNegotiate(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="NEGOTIATE",
+        message_type="request",
+        message_id=1,
+        session_id=None,
+        tree_id=None,
+        dialect="SMB 3.1.1",
+        dialects=[
+            "SMB 2.1",
+            "SMB 3.0",
+            "SMB 3.1.1",
+        ],
+    )
+
+    result = smb_negotiate_to_timeline(
+        observation
+    )
+
+    assert result.timestamp == TIMESTAMP
+    assert result.record_type == "smb_negotiate"
+    assert result.data["type"] == "smb_negotiate"
+    assert result.data["dialect"] == "SMB 3.1.1"
+
+
+def test_observation_to_timeline_supports_smb_negotiate():
+    observation = SMBNegotiate(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="NEGOTIATE",
+        message_type="request",
+        message_id=1,
+        session_id=None,
+        tree_id=None,
+        dialect="SMB 3.1.1",
+        dialects=None,
+    )
+
+    result = observation_to_timeline(
+        observation
+    )
+
+    assert result.record_type == "smb_negotiate"

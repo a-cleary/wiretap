@@ -22,6 +22,7 @@ from wiretap.models import (
     SMBSessionSetup,
     SMBTreeConnect,
     SMBTransaction,
+    SMBNegotiate,
 )
 from wiretap.output.jsonl import (
     connection_to_dict,
@@ -61,6 +62,8 @@ from wiretap.output.jsonl import (
     smb_observation_to_dict,
     smb_transaction_to_dict,
     serialize_smb_transaction,
+    serialize_smb_negotiate,
+    smb_negotiate_to_dict,
 )
 from wiretap.capture.flow import Flow
 
@@ -1215,3 +1218,69 @@ def test_smb_transaction_serializes_as_json():
     assert parsed["request"]["identity"] == (
         r"CORP\alice"
     )
+
+
+def test_smb_negotiate_to_dict():
+    observation = SMBNegotiate(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="NEGOTIATE",
+        message_type="request",
+        message_id=1,
+        session_id=None,
+        tree_id=None,
+        dialect="SMB 3.1.1",
+        dialects=[
+            "SMB 2.1",
+            "SMB 3.0",
+            "SMB 3.1.1",
+        ],
+    )
+
+    result = smb_negotiate_to_dict(
+        observation
+    )
+
+    assert result["type"] == "smb_negotiate"
+    assert result["source_ip"] == "10.10.10.42"
+    assert result["destination_port"] == 445
+    assert result["command"] == "NEGOTIATE"
+    assert result["message_type"] == "request"
+    assert result["dialect"] == "SMB 3.1.1"
+    assert result["dialects"] == [
+        "SMB 2.1",
+        "SMB 3.0",
+        "SMB 3.1.1",
+    ]
+
+
+def test_smb_negotiate_serializes_as_json():
+    observation = SMBNegotiate(
+        timestamp=TIMESTAMP,
+        source_ip="10.10.10.42",
+        source_port=49152,
+        destination_ip="10.10.10.30",
+        destination_port=445,
+        version="SMB3",
+        command="NEGOTIATE",
+        message_type="response",
+        message_id=1,
+        session_id=None,
+        tree_id=None,
+        dialect="SMB 3.1.1",
+        dialects=None,
+    )
+
+    result = serialize_smb_negotiate(
+        observation
+    )
+
+    parsed = json.loads(result)
+
+    assert parsed["type"] == "smb_negotiate"
+    assert parsed["message_type"] == "response"
+    assert parsed["dialect"] == "SMB 3.1.1"
